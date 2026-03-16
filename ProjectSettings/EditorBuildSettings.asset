@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 0
+    path: Assets/Scenes/SampleScene.unity
+    guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 9350841a55f349b4098ac4d86638ab6e
+  - enabled: 0
+    path: Assets/Scenes/BRP Sample SceneGabinete.unity
+    guid: 7735f922b20ff144c89b6fcc96b05dd0
+  - enabled: 1
+    path: Assets/Fries and Seagull/Interior 01/BRP Sample SceneGabinete.unity
+    guid: a95206326fc65b644b05f6d9b4ceaad8
+  m_configObjects:
+    UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 0d84a465de55ff344a24a011c58b916b, type: 2}
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 0acd69796bff51345b4ebd997c9fa41d, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 48cf7f24c63c07444bf5f03f4800e5e2, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: bfa7018155d854f49843bb3d25f17074, type: 2}
+  m_UseUCBPForAssetBundles: 0
