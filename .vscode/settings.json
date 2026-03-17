@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "savit-game.sln"
+    "dotnet.defaultSolution": "savit-AR.sln"
 }

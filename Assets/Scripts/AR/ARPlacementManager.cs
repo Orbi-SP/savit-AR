@@ -49,6 +49,13 @@ namespace SavitGame.AR {
         [Tooltip("Escala aplicada ao prefab ao instanciar. Se o prefab veio de uma cena real em escala 1:1 (objetos a 60m de distância), use valores pequenos como 0.02.")]
         public float instanceScale = 1f;
 
+        [Header("Debug")]
+        [Tooltip("Liga logs throttled para diagnosticar tracking/centro de tela/alinhamento do ghost no device")]
+        public bool debugLogs = false;
+
+        [Tooltip("Intervalo (segundos) entre logs quando debugLogs=true")]
+        public float debugLogInterval = 0.25f;
+
         [Header("Eventos")]
         [Tooltip("Chamado quando o objeto é posicionado. Conecte ao ARGameManager.OnScenePlaced()")]
         public UnityEvent onScenePlaced;
@@ -62,12 +69,18 @@ namespace SavitGame.AR {
         private Pose lastValidPlacementPose;
         private bool hasLastValidPlacementPose = false;
         private bool placementPoseIsValid = false;
-        private Vector3 ghostRootOffset;
+        // Offset entre o root do prefab e o centro visual (bounds) em ESPAÇO LOCAL da pose.
+        // Precisa ser local para rotacionar junto com o ghost e não “derivar” quando a rotação muda.
+        private Vector3 ghostRootOffsetLocal;
+        private bool hasGhostRootOffsetLocal = false;
         private bool usingFallbackPose = false;
         private bool planePoseIsValid = false;
         private Pose lastValidPlanePose;
         private bool hasLastValidPlanePose = false;
         private static readonly List<ARRaycastHit> hits = new List<ARRaycastHit>();
+
+        private float nextDebugLogTime = 0f;
+        private Vector2 lastRaycastScreenCenter;
 
         private void Awake() {
             ResolveManagersIfNeeded();
@@ -196,8 +209,9 @@ namespace SavitGame.AR {
 
             bool gotPlaneHit = false;
             if (raycastManager != null) {
-                var screenCenter3 = placementCamera.ViewportToScreenPoint(new Vector3(0.5f, 0.5f, 0f));
-                var screenCenter = new Vector2(screenCenter3.x, screenCenter3.y);
+                // Use o centro real da tela (mais robusto do que viewport da câmera em casos de rect/aspect).
+                var screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                lastRaycastScreenCenter = screenCenter;
                 gotPlaneHit = raycastManager.Raycast(
                     screenCenter,
                     hits,
@@ -224,6 +238,8 @@ namespace SavitGame.AR {
                 placementPose.rotation = Quaternion.LookRotation(cameraBearing.normalized);
                 lastValidPlacementPose = placementPose;
                 usingFallbackPose = false;
+
+                MaybeLogDebug("plane", extra: $"hitCount={hits.Count} trackableId={hits[0].trackableId}");
                 return;
             }
 
@@ -239,8 +255,11 @@ namespace SavitGame.AR {
                 placementPose = new Pose(fallbackPos, Quaternion.LookRotation(bearing.normalized));
                 placementPoseIsValid = true;
                 usingFallbackPose = true;
+
+                MaybeLogDebug("fallback", extra: "noPlaneHit");
             } else {
                 placementPoseIsValid = false;
+                MaybeLogDebug("invalid", extra: "noPlaneHit");
             }
         }
 
@@ -264,23 +283,42 @@ namespace SavitGame.AR {
                     PrepareGhostInstance(ghostInstance);
                     if (recenterByRenderBounds) {
                         RecenterInstanceToPose(ghostInstance, placementPose);
-                        ghostRootOffset = ghostInstance.transform.position - placementPose.position;
+                        // Salva offset em espaço local da pose para que ele rotacione junto com o ghost.
+                        ghostRootOffsetLocal = Quaternion.Inverse(placementPose.rotation) * (ghostInstance.transform.position - placementPose.position);
+                        hasGhostRootOffsetLocal = true;
                     } else {
-                        ghostRootOffset = Vector3.zero;
+                        ghostRootOffsetLocal = Vector3.zero;
+                        hasGhostRootOffsetLocal = true;
                     }
                     if (confirmButton != null) confirmButton.SetActive(true);
                     if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(false);
-                    Debug.Log($"👻 Ghost preview spawnado. scale={instanceScale} offset={ghostRootOffset}");
+                    Debug.Log($"👻 Ghost preview spawnado. scale={instanceScale} offsetLocal={ghostRootOffsetLocal}");
                 }
 
-                // Ghost segue a superfície — aplica o mesmo offset de recenter calculado no spawn
-                ghostInstance.transform.rotation = placementPose.rotation;
-                ghostInstance.transform.position = placementPose.position + ghostRootOffset;
+                // Ghost segue a superfície — aplica offset local rotacionado para não "derivar" ao virar.
+                var targetRot = placementPose.rotation;
+                var targetPos = placementPose.position + (hasGhostRootOffsetLocal ? (targetRot * ghostRootOffsetLocal) : Vector3.zero);
+
+                float t = ghostFollowSpeed <= 0f ? 1f : (1f - Mathf.Exp(-ghostFollowSpeed * Time.deltaTime));
+                ghostInstance.transform.rotation = Quaternion.Slerp(ghostInstance.transform.rotation, targetRot, t);
+                ghostInstance.transform.position = Vector3.Lerp(ghostInstance.transform.position, targetPos, t);
+
+                if (debugLogs) {
+                    Vector3 posErr = ghostInstance.transform.position - targetPos;
+                    float yawGhost = ghostInstance.transform.rotation.eulerAngles.y;
+                    float yawTarget = targetRot.eulerAngles.y;
+                    MaybeLogDebug(
+                        "ghost",
+                        extra: $"posErr=({posErr.x:F3},{posErr.y:F3},{posErr.z:F3}) yawGhost={yawGhost:F1} yawTarget={yawTarget:F1}"
+                    );
+                }
             } else {
                 // Superfície perdida — oculta ghost e botão
                 if (ghostInstance != null) ghostInstance.SetActive(false);
                 if (confirmButton != null) confirmButton.SetActive(false);
                 if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(true);
+
+                MaybeLogDebug("hidden", extra: "noPlacementUI");
             }
 
             // Reativa o ghost se a superfície voltou
@@ -288,7 +326,32 @@ namespace SavitGame.AR {
                 ghostInstance.SetActive(true);
                 if (confirmButton != null) confirmButton.SetActive(true);
                 if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(false);
+
+                MaybeLogDebug("shown", extra: "surfaceBack");
             }
+        }
+
+        private void MaybeLogDebug(string phase, string extra) {
+            if (!debugLogs) return;
+            float now = Time.unscaledTime;
+            float interval = Mathf.Max(0.05f, debugLogInterval);
+            if (now < nextDebugLogTime) return;
+            nextDebugLogTime = now + interval;
+
+            string cam = placementCamera != null
+                ? $"camPos=({placementCamera.transform.position.x:F3},{placementCamera.transform.position.y:F3},{placementCamera.transform.position.z:F3}) camYaw={placementCamera.transform.rotation.eulerAngles.y:F1}"
+                : "cam=null";
+
+            string pose = $"planeValid={planePoseIsValid} poseValid={placementPoseIsValid} usingFallback={usingFallbackPose} " +
+                          $"screenCenter=({lastRaycastScreenCenter.x:F0},{lastRaycastScreenCenter.y:F0}) screen=({Screen.width},{Screen.height}) " +
+                          $"posePos=({placementPose.position.x:F3},{placementPose.position.y:F3},{placementPose.position.z:F3}) poseYaw={placementPose.rotation.eulerAngles.y:F1} " +
+                          $"offsetLocal=({ghostRootOffsetLocal.x:F3},{ghostRootOffsetLocal.y:F3},{ghostRootOffsetLocal.z:F3})";
+
+            Debug.Log($"[ARPlacementDebug] phase={phase} {cam} {pose} {extra}");
+        }
+
+        private void MaybeLogDebug(string phase) {
+            MaybeLogDebug(phase, extra: "");
         }
 
         /// <summary>
@@ -302,17 +365,28 @@ namespace SavitGame.AR {
 
             Pose finalPose;
 
-            bool canPlaceNow = requirePlaneForPlacement ? planePoseIsValid : placementPoseIsValid;
-
-            if (canPlaceNow) {
-                finalPose = placementPose;
-            } else if (requirePlaneForPlacement && hasLastValidPlanePose) {
-                finalPose = lastValidPlanePose;
-            } else if (!requirePlaneForPlacement && hasLastValidPlacementPose) {
-                finalPose = lastValidPlacementPose;
+            // Se o ghost estiver ativo, use a pose VISÍVEL no momento do clique.
+            // Isso evita discrepância quando o ghost está suavizando (atrasado) mas o raycast já avançou.
+            if (ghostInstance != null && ghostInstance.activeInHierarchy && hasGhostRootOffsetLocal) {
+                var ghostRot = ghostInstance.transform.rotation;
+                // Converte posição do ROOT do ghost para o "centro visual" (pose desejada = centro dos bounds)
+                // rootPos = centerPos + rot * offsetLocal  =>  centerPos = rootPos - rot * offsetLocal
+                var ghostCenterPos = ghostInstance.transform.position - (ghostRot * ghostRootOffsetLocal);
+                finalPose = new Pose(ghostCenterPos, ghostRot);
             } else {
-                Debug.LogWarning("ARPlacementManager: ConfirmPlacement sem pose válida (plano) e sem última pose de plano.");
-                return;
+
+                bool canPlaceNow = requirePlaneForPlacement ? planePoseIsValid : placementPoseIsValid;
+
+                if (canPlaceNow) {
+                    finalPose = placementPose;
+                } else if (requirePlaneForPlacement && hasLastValidPlanePose) {
+                    finalPose = lastValidPlanePose;
+                } else if (!requirePlaneForPlacement && hasLastValidPlacementPose) {
+                    finalPose = lastValidPlacementPose;
+                } else {
+                    Debug.LogWarning("ARPlacementManager: ConfirmPlacement sem pose válida (plano) e sem última pose de plano.");
+                    return;
+                }
             }
 
             if (gameScenePrefab == null) {
@@ -526,6 +600,7 @@ namespace SavitGame.AR {
             isPlaced = false;
             placementPoseIsValid = false;
             planePoseIsValid = false;
+            hasGhostRootOffsetLocal = false;
             if (planeManager != null)
                 planeManager.enabled = true;
 

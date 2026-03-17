@@ -1757,7 +1757,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SavitGame.AR.ARPlaneVisualizer
   showPlanes: 1
-  planeMaterial: {fileID: 10652, guid: 0000000000000000f000000000000000, type: 0}
+  planeMaterial: {fileID: 2100000, guid: c2b2570df30f96f45a6a350d5861f015, type: 2}
 --- !u!1 &999921793
 GameObject:
   m_ObjectHideFlags: 0
