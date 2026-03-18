@@ -27,6 +27,8 @@ public class MotherboardPlacer : MonoBehaviour
 
     private Vector3 originalPos;
     private Quaternion originalRot;
+    private Vector3 originalLocalPos;
+    private Quaternion originalLocalRot;
     private float accum;
     private bool prevHolding;
     private bool isSnapped;
@@ -35,7 +37,17 @@ public class MotherboardPlacer : MonoBehaviour
     {
         originalPos = transform.position;
         originalRot = transform.rotation;
+        originalLocalPos = transform.localPosition;
+        originalLocalRot = transform.localRotation;
         accum = 0f;
+
+        // Movimentação é por script; física dinâmica aqui tende a dar instabilidade.
+        var rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
         
         // Garantir que no início da cena Gabinete:
         // - Second Camera está ativa (para ver o gabinete)
@@ -69,13 +81,13 @@ public class MotherboardPlacer : MonoBehaviour
 
         accum = Mathf.Clamp(accum, moveLimits.x, moveLimits.y);
 
-        Vector3 target = originalPos;
-        if (useAxisX) target.x = originalPos.x + accum;
-        else          target.z = originalPos.z + accum;
-        target.y = holding ? liftY : originalPos.y;
+        Vector3 targetLocal = originalLocalPos;
+        if (useAxisX) targetLocal.x = originalLocalPos.x + accum;
+        else          targetLocal.z = originalLocalPos.z + accum;
+        targetLocal.y = holding ? liftY : originalLocalPos.y;
 
-        transform.position = Vector3.Lerp(transform.position, target, Time.deltaTime * 5f);
-        transform.rotation = originalRot;
+        transform.localPosition = Vector3.Lerp(transform.localPosition, targetLocal, Time.deltaTime * 5f);
+        transform.localRotation = originalLocalRot;
 
         // snap só ao SOLTAR e se estiver alinhado em X/Z com a zona
         if (prevHolding && !holding && IsAlignedXZ(transform.position))

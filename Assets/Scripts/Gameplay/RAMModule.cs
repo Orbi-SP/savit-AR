@@ -16,8 +16,8 @@ public class RAMModule : MonoBehaviour, IReleasable
     public RAMSlot[] slots;
     public bool lockWhenSnapped = true;
 
-    private Vector3 originalPos;
-    private Quaternion originalRot;
+    private Vector3 originalLocalPos;
+    private Quaternion originalLocalRot;
     private float accum;
     private bool prevHolding;
     private bool isSnapped;
@@ -26,9 +26,17 @@ public class RAMModule : MonoBehaviour, IReleasable
 
     void Start()
     {
-        originalPos = transform.position;
-        originalRot = transform.rotation;
+        originalLocalPos = transform.localPosition;
+        originalLocalRot = transform.localRotation;
         accum = 0f;
+
+        // Esses objetos são movidos por script; física dinâmica aqui costuma causar jitter/"voar".
+        var rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
 
         if (slots == null || slots.Length == 0)
             slots = FindObjectsOfType<RAMSlot>();
@@ -59,26 +67,26 @@ public class RAMModule : MonoBehaviour, IReleasable
 
         accum = Mathf.Clamp(accum, moveLimits.x, moveLimits.y);
 
-        Vector3 currentPos = transform.position;
+        Vector3 currentLocalPos = transform.localPosition;
 
         float offsetX = useAxisX ? accum : 0f;
         float offsetZ = useAxisX ? 0f : accum;
-        float targetX = originalPos.x + offsetX;
-        float targetZ = originalPos.z + offsetZ;
-        float targetY = holding ? liftY : originalPos.y;
+        float targetX = originalLocalPos.x + offsetX;
+        float targetZ = originalLocalPos.z + offsetZ;
+        float targetY = holding ? liftY : originalLocalPos.y;
 
         Vector3 finalTarget = new Vector3(targetX, targetY, targetZ);
-        transform.position = Vector3.Lerp(currentPos, finalTarget, Time.deltaTime * 5f);
+        transform.localPosition = Vector3.Lerp(currentLocalPos, finalTarget, Time.deltaTime * 5f);
 
         // Rotação
         if (holding)
         {
-            var targetRot = Quaternion.Euler(270f, originalRot.eulerAngles.y, originalRot.eulerAngles.z);
-            transform.rotation = Quaternion.Lerp(transform.rotation, targetRot, Time.deltaTime * 10f);
+            var targetLocalRot = Quaternion.Euler(270f, originalLocalRot.eulerAngles.y, originalLocalRot.eulerAngles.z);
+            transform.localRotation = Quaternion.Lerp(transform.localRotation, targetLocalRot, Time.deltaTime * 10f);
         }
         else
         {
-            transform.rotation = Quaternion.Lerp(transform.rotation, originalRot, Time.deltaTime * 5f);
+            transform.localRotation = Quaternion.Lerp(transform.localRotation, originalLocalRot, Time.deltaTime * 5f);
         }
 
         // Snap ao soltar

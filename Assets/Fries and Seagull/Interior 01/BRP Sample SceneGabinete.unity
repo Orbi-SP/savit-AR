@@ -1729,6 +1729,8 @@ MonoBehaviour:
   requirePlaneForPlacement: 1
   fallbackDistance: 0.65
   instanceScale: 0.19
+  debugLogs: 1
+  debugLogInterval: 0.25
   onScenePlaced:
     m_PersistentCalls:
       m_Calls:
