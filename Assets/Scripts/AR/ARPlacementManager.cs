@@ -7,6 +7,7 @@ using UnityEngine.XR.ARSubsystems;
 using UnityEngine.InputSystem;
 using Unity.XR.CoreUtils;
 using UnityEngine.UI;
+using TMPro;
 
 namespace SavitGame.AR {
     public class ARPlacementManager : MonoBehaviour {
@@ -26,6 +27,14 @@ namespace SavitGame.AR {
         [Header("UI")]
         public GameObject tapToPlaceUI;      // texto "Aponte para uma superfície"
         public GameObject confirmButton;     // botão "Colocar aqui" — aparece com o ghost
+        [Tooltip("Botão opcional abaixo do 'Colocar aqui' para alternar pré-visualização do ghost (sólido/translúcido).")]
+        public GameObject previewToggleButton;
+        [Tooltip("Slider opcional para rotacionar no eixo Y durante o placement (yaw).")]
+        public GameObject yawSlider;
+
+        [Header("UI - Textos")]
+        public string previewText = "Ver como está";
+        public string backToPlaceText = "Voltar a colocar";
 
         [Header("Ajustes do Ghost")]
         [Tooltip("Velocidade de suavização do ghost ao acompanhar o pose")]
@@ -33,6 +42,13 @@ namespace SavitGame.AR {
 
         [Tooltip("Offset vertical para evitar z-fighting com o plano")]
         public float ghostVerticalOffset = 0.005f;
+
+        [Header("Ajuste na Superfície")]
+        [Tooltip("Se true, ajusta a altura para o objeto ficar 'em cima' do plano (evita ficar dentro da mesa/chão).")]
+        public bool snapToSurface = true;
+
+        [Tooltip("Folga extra (metros) ao assentar na superfície. Ex: 0.001 = 1mm")]
+        public float surfaceSnapPadding = 0.0015f;
 
         [Tooltip("Recentra instância usando bounds dos renderers (corrige prefabs com offsets grandes)")]
         public bool recenterByRenderBounds = true;
@@ -49,6 +65,13 @@ namespace SavitGame.AR {
         [Header("Escala")]
         [Tooltip("Escala aplicada ao prefab ao instanciar. Se o prefab veio de uma cena real em escala 1:1 (objetos a 60m de distância), use valores pequenos como 0.02.")]
         public float instanceScale = 1f;
+
+        [Header("Rotação (Placement)")]
+        [Tooltip("Offset de rotação em Y (graus) aplicado durante o placement (ghost e cena final).")]
+        public float yawOffsetDegrees = 0f;
+
+        [Tooltip("Passo (graus) usado pelos botões de girar.")]
+        public float yawStepDegrees = 15f;
 
         [Header("Física")]
         [Tooltip("Após posicionar a cena, força todos Rigidbody do prefab a ficarem kinematic (evita peças 'voando' por instabilidade de física/teleportes).")]
@@ -74,6 +97,7 @@ namespace SavitGame.AR {
         private bool placementAllowed = false;
         private bool confirmInProgress = false;
         private bool cameraWarningLogged = false;
+        private bool confirmButtonWarningLogged = false;
         private Pose placementPose;
         private Pose lastValidPlacementPose;
         private bool hasLastValidPlacementPose = false;
@@ -105,6 +129,15 @@ namespace SavitGame.AR {
         private float nextDebugLogTime = 0f;
         private Vector2 lastRaycastScreenCenter;
         private float nextPlacedDebugLogTime = 0f;
+
+        private bool isGhostFrozenForPreview = false;
+        private bool hasFrozenGhostPose = false;
+        private Vector3 frozenGhostCenterPos;
+        private Quaternion frozenGhostBaseRotation;
+        private float frozenYawOffsetAtFreeze = 0f;
+
+        private Slider yawSliderComponent;
+        private bool yawSliderListenerAttached = false;
 
         private void Awake() {
             s_activeInstanceCount++;
@@ -143,8 +176,63 @@ namespace SavitGame.AR {
             if (confirmButton != null)
                 confirmButton.SetActive(false);
 
+            if (previewToggleButton != null)
+                previewToggleButton.SetActive(false);
+
+            if (yawSlider != null)
+                yawSlider.SetActive(false);
+
+            EnsureYawSliderSetup();
+
+            if (confirmButton == null) {
+                Debug.LogWarning("ARPlacementManager: confirmButton (Colocar aqui) não está atribuído/encontrado. Arraste o GameObject do botão no campo 'Confirm Button'.");
+            }
+
             // Por padrão, o placement só fica ativo quando o ARGameManager entrar no estado Placing.
             placementAllowed = false;
+        }
+
+        private Slider GetYawSliderComponent() {
+            if (yawSliderComponent != null) return yawSliderComponent;
+            if (yawSlider == null) return null;
+
+            yawSliderComponent = yawSlider.GetComponent<Slider>();
+            if (yawSliderComponent != null) return yawSliderComponent;
+
+            yawSliderComponent = yawSlider.GetComponentInChildren<Slider>(includeInactive: true);
+            return yawSliderComponent;
+        }
+
+        private void EnsureYawSliderSetup() {
+            var slider = GetYawSliderComponent();
+            if (slider == null) return;
+
+            // Se o slider estiver mal configurado (range 0), ele sempre vai disparar 0.0.
+            float range = slider.maxValue - slider.minValue;
+            if (range < 1f) {
+                slider.minValue = -180f;
+                slider.maxValue = 180f;
+            }
+
+            slider.wholeNumbers = false;
+            slider.interactable = true;
+
+            // Auto-bind: não depende do wiring manual no Inspector.
+            // (Em runtime, isso não remove PersistentListeners; apenas garante que funcione.)
+            if (!yawSliderListenerAttached) {
+                slider.onValueChanged.AddListener(OnYawSliderValueChanged);
+                yawSliderListenerAttached = true;
+            }
+
+            UpdateYawSliderValue();
+
+            if (debugLogs) {
+                Debug.Log($"[ARPlacementDebug] yawSlider setup min={slider.minValue:F1} max={slider.maxValue:F1} whole={slider.wholeNumbers} interactable={slider.interactable}");
+            }
+        }
+
+        private void OnYawSliderValueChanged(float value) {
+            SetYawOffsetDegrees(value);
         }
 
         private void ResolveAnchorManagerIfNeeded() {
@@ -178,6 +266,42 @@ namespace SavitGame.AR {
                 if (byName != null) confirmButton = byName;
             }
 
+            // Tenta encontrar pelo texto do botão (TextMeshPro ou legacy Text).
+            if (confirmButton == null) {
+                var buttons = FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (var b in buttons) {
+                    if (b == null) continue;
+                    string n = b.gameObject.name;
+                    if (n.IndexOf("colocar", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("place", System.StringComparison.OrdinalIgnoreCase) >= 0) {
+                        confirmButton = b.gameObject;
+                        break;
+                    }
+
+                    var tmp = b.GetComponentInChildren<TMP_Text>(includeInactive: true);
+                    if (tmp != null) {
+                        var t = tmp.text;
+                        if (!string.IsNullOrWhiteSpace(t) &&
+                            (t.IndexOf("colocar aqui", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             t.IndexOf("place here", System.StringComparison.OrdinalIgnoreCase) >= 0)) {
+                            confirmButton = b.gameObject;
+                            break;
+                        }
+                    }
+
+                    var legacy = b.GetComponentInChildren<Text>(includeInactive: true);
+                    if (legacy != null) {
+                        var t = legacy.text;
+                        if (!string.IsNullOrWhiteSpace(t) &&
+                            (t.IndexOf("colocar aqui", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             t.IndexOf("place here", System.StringComparison.OrdinalIgnoreCase) >= 0)) {
+                            confirmButton = b.gameObject;
+                            break;
+                        }
+                    }
+                }
+            }
+
             // Também aceita referência ao componente Button (se alguém arrastou o Button e não o GameObject pai).
             if (confirmButton == null) {
                 var btn = FindFirstObjectByType<Button>();
@@ -190,8 +314,53 @@ namespace SavitGame.AR {
             placementAllowed = allowed;
 
             if (!placementAllowed) {
+                isGhostFrozenForPreview = false;
                 if (ghostInstance != null) ghostInstance.SetActive(false);
                 if (confirmButton != null) confirmButton.SetActive(false);
+                if (previewToggleButton != null) previewToggleButton.SetActive(false);
+                if (yawSlider != null) yawSlider.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Chamado pelo botão "Ver como está" / "Voltar a colocar".
+        /// Congela o ghost na pose atual para o usuário inspecionar como ficaria se tivesse colocado.
+        /// Ao clicar novamente, volta a acompanhar a superfície.
+        /// </summary>
+        public void ToggleGhostLook() {
+            if (isPlaced) return;
+            if (!placementAllowed) return;
+            if (ghostInstance == null) return;
+
+            isGhostFrozenForPreview = !isGhostFrozenForPreview;
+
+            if (isGhostFrozenForPreview) {
+                CacheFrozenGhostPose();
+                ApplyFrozenYawIfNeeded();
+            } else {
+                hasFrozenGhostPose = false;
+            }
+            UpdatePreviewToggleButtonLabel();
+
+            if (debugLogs) {
+                Debug.Log($"[ARPlacementDebug] ghostPreviewFreeze toggled frozen={isGhostFrozenForPreview}");
+            }
+        }
+
+        private void UpdatePreviewToggleButtonLabel() {
+            if (previewToggleButton == null) return;
+
+            string text = isGhostFrozenForPreview ? backToPlaceText : previewText;
+
+            var tmp = previewToggleButton.GetComponentInChildren<TMP_Text>(includeInactive: true);
+            if (tmp != null) {
+                tmp.text = text;
+                return;
+            }
+
+            var legacy = previewToggleButton.GetComponentInChildren<Text>(includeInactive: true);
+            if (legacy != null) {
+                legacy.text = text;
             }
         }
 
@@ -254,6 +423,22 @@ namespace SavitGame.AR {
             }
             if (!placementAllowed) return;
 
+            // Modo "Ver como está": mantém o ghost fixo, sem raycast/smoothing.
+            if (isGhostFrozenForPreview) {
+                if (ghostInstance != null && !ghostInstance.activeSelf) ghostInstance.SetActive(true);
+                if (confirmButton != null && !confirmButton.activeSelf) confirmButton.SetActive(true);
+                if (previewToggleButton != null && !previewToggleButton.activeSelf) previewToggleButton.SetActive(true);
+                if (yawSlider != null && !yawSlider.activeSelf) {
+                    yawSlider.SetActive(true);
+                    EnsureYawSliderSetup();
+                }
+                SetTapToPlaceUIVisible(false);
+
+                // Permite que slider/botões de rotação alterem o yaw mesmo com o ghost congelado.
+                ApplyFrozenYawIfNeeded();
+                return;
+            }
+
             UpdatePlacementPose();
             UpdateGhost();
         }
@@ -304,6 +489,7 @@ namespace SavitGame.AR {
                 var cameraBearing = new Vector3(cameraForward.x, 0, cameraForward.z);
                 if (cameraBearing.sqrMagnitude < 0.0001f) cameraBearing = placementCamera.transform.forward;
                 placementPose.rotation = Quaternion.LookRotation(cameraBearing.normalized);
+                placementPose.rotation = ApplyYawOffset(placementPose.rotation);
                 lastValidPlacementPose = placementPose;
                 usingFallbackPose = false;
 
@@ -320,7 +506,7 @@ namespace SavitGame.AR {
                 Vector3 bearing = new Vector3(camForward.x, 0f, camForward.z);
                 if (bearing.sqrMagnitude < 0.0001f) bearing = placementCamera.transform.up;
 
-                placementPose = new Pose(fallbackPos, Quaternion.LookRotation(bearing.normalized));
+                placementPose = new Pose(fallbackPos, ApplyYawOffset(Quaternion.LookRotation(bearing.normalized)));
                 placementPoseIsValid = true;
                 usingFallbackPose = true;
 
@@ -331,10 +517,88 @@ namespace SavitGame.AR {
             }
         }
 
+        private Quaternion ApplyYawOffset(Quaternion baseRotation) {
+            if (Mathf.Abs(yawOffsetDegrees) < 0.0001f) return baseRotation;
+            return Quaternion.AngleAxis(yawOffsetDegrees, Vector3.up) * baseRotation;
+        }
+
+        private void NormalizeYawOffset() {
+            // Mantém valores controlados para evitar overflow ao girar muitas vezes.
+            yawOffsetDegrees = Mathf.Repeat(yawOffsetDegrees + 180f, 360f) - 180f;
+        }
+
+        // ── UI hooks (botões/slider) ─────────────────────────────────────────
+
+        public void RotateYawLeft() {
+            if (isPlaced) return;
+            yawOffsetDegrees -= yawStepDegrees;
+            NormalizeYawOffset();
+            ApplyFrozenYawIfNeeded();
+        }
+
+        public void RotateYawRight() {
+            if (isPlaced) return;
+            yawOffsetDegrees += yawStepDegrees;
+            NormalizeYawOffset();
+            ApplyFrozenYawIfNeeded();
+        }
+
+        /// <summary>
+        /// Para usar com Slider (OnValueChanged). Sugestão: slider -180..180.
+        /// </summary>
+        public void SetYawOffsetDegrees(float degrees) {
+            if (isPlaced) return;
+            yawOffsetDegrees = degrees;
+            NormalizeYawOffset();
+            ApplyFrozenYawIfNeeded();
+
+            UpdateYawSliderValue();
+
+            if (debugLogs) {
+                Debug.Log($"[ARPlacementDebug] SetYawOffsetDegrees called value={degrees:F1} normalized={yawOffsetDegrees:F1}");
+            }
+        }
+
+        private void UpdateYawSliderValue() {
+            var slider = GetYawSliderComponent();
+            if (slider == null) return;
+
+            if (Mathf.Abs(slider.value - yawOffsetDegrees) > 0.01f) {
+                slider.SetValueWithoutNotify(yawOffsetDegrees);
+            }
+        }
+
+        private void CacheFrozenGhostPose() {
+            if (ghostInstance == null) return;
+            if (!hasGhostRootOffsetLocal) return;
+
+            frozenGhostBaseRotation = ghostInstance.transform.rotation;
+            frozenYawOffsetAtFreeze = yawOffsetDegrees;
+
+            // Centro visual = rootPos - rot * offsetLocal
+            frozenGhostCenterPos = ghostInstance.transform.position - (frozenGhostBaseRotation * ghostRootOffsetLocal);
+            hasFrozenGhostPose = true;
+        }
+
+        private void ApplyFrozenYawIfNeeded() {
+            if (!isGhostFrozenForPreview) return;
+            if (!hasFrozenGhostPose) return;
+            if (ghostInstance == null) return;
+            if (!hasGhostRootOffsetLocal) return;
+
+            float delta = yawOffsetDegrees - frozenYawOffsetAtFreeze;
+            Quaternion rot = Quaternion.AngleAxis(delta, Vector3.up) * frozenGhostBaseRotation;
+            Vector3 rootPos = frozenGhostCenterPos + (rot * ghostRootOffsetLocal);
+
+            ghostInstance.transform.SetPositionAndRotation(rootPos, rot);
+        }
+
         private void UpdateGhost() {
             if (ghostScenePrefab == null) {
-                if (tapToPlaceUI != null) tapToPlaceUI.SetActive(true);
+                SetTapToPlaceUIVisible(true);
                 if (confirmButton != null) confirmButton.SetActive(false);
+                if (previewToggleButton != null) previewToggleButton.SetActive(false);
+                if (yawSlider != null) yawSlider.SetActive(false);
                 return;
             }
 
@@ -342,6 +606,11 @@ namespace SavitGame.AR {
             bool canShowPlacementUI = requirePlaneForPlacement ? planePoseIsValid : placementPoseIsValid;
 
             if (canShowPlacementUI) {
+                if (confirmButton == null && !confirmButtonWarningLogged) {
+                    confirmButtonWarningLogged = true;
+                    Debug.LogWarning("ARPlacementManager: ghost ativo mas 'confirmButton' está null. O botão 'Colocar aqui' não vai aparecer até você atribuir/renomear corretamente.");
+                }
+
                 // Spawn do ghost na primeira vez que encontrar superfície
                 if (ghostInstance == null) {
                     ghostInstance = Instantiate(ghostScenePrefab, placementPose.position, placementPose.rotation);
@@ -349,17 +618,32 @@ namespace SavitGame.AR {
                     if (instanceScale != 1f)
                         ghostInstance.transform.localScale = Vector3.one * instanceScale;
                     PrepareGhostInstance(ghostInstance);
+
                     if (recenterByRenderBounds) {
                         RecenterInstanceToPose(ghostInstance, placementPose);
-                        // Salva offset em espaço local da pose para que ele rotacione junto com o ghost.
-                        ghostRootOffsetLocal = Quaternion.Inverse(placementPose.rotation) * (ghostInstance.transform.position - placementPose.position);
-                        hasGhostRootOffsetLocal = true;
-                    } else {
-                        ghostRootOffsetLocal = Vector3.zero;
-                        hasGhostRootOffsetLocal = true;
                     }
+
+                    if (snapToSurface) {
+                        // Assenta o ghost no Y do plano (placementPose já inclui ghostVerticalOffset).
+                        LiftRootToSurfaceY(ghostInstance, placementPose.position.y);
+                    }
+
+                    // Salva offset em espaço local da pose para que ele rotacione junto com o ghost.
+                    ghostRootOffsetLocal = Quaternion.Inverse(placementPose.rotation) * (ghostInstance.transform.position - placementPose.position);
+                    hasGhostRootOffsetLocal = true;
+
                     if (confirmButton != null) confirmButton.SetActive(true);
-                    if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(false);
+                    if (previewToggleButton != null) {
+                        previewToggleButton.SetActive(true);
+                        isGhostFrozenForPreview = false;
+                        UpdatePreviewToggleButtonLabel();
+                    }
+                    if (yawSlider != null) {
+                        yawSlider.SetActive(true);
+                        EnsureYawSliderSetup();
+                        UpdateYawSliderValue();
+                    }
+                    SetTapToPlaceUIVisible(false);
                     Debug.Log($"👻 Ghost preview spawnado. scale={instanceScale} offsetLocal={ghostRootOffsetLocal}");
                 }
 
@@ -384,7 +668,9 @@ namespace SavitGame.AR {
                 // Superfície perdida — oculta ghost e botão
                 if (ghostInstance != null) ghostInstance.SetActive(false);
                 if (confirmButton != null) confirmButton.SetActive(false);
-                if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(true);
+                if (previewToggleButton != null) previewToggleButton.SetActive(false);
+                if (yawSlider != null) yawSlider.SetActive(false);
+                SetTapToPlaceUIVisible(true);
 
                 MaybeLogDebug("hidden", extra: "noPlacementUI");
             }
@@ -393,10 +679,79 @@ namespace SavitGame.AR {
             if (canShowPlacementUI && ghostInstance != null && !ghostInstance.activeSelf) {
                 ghostInstance.SetActive(true);
                 if (confirmButton != null) confirmButton.SetActive(true);
-                if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(false);
+                if (previewToggleButton != null) {
+                    previewToggleButton.SetActive(true);
+                    UpdatePreviewToggleButtonLabel();
+                }
+                if (yawSlider != null) {
+                    yawSlider.SetActive(true);
+                    EnsureYawSliderSetup();
+                    UpdateYawSliderValue();
+                }
+                SetTapToPlaceUIVisible(false);
 
                 MaybeLogDebug("shown", extra: "surfaceBack");
             }
+        }
+
+        private void SetTapToPlaceUIVisible(bool visible) {
+            if (tapToPlaceUI == null) return;
+
+            // Se os botões estiverem dentro do tapToPlaceUI, não podemos desativar o container.
+            // Caso contrário o botão some mesmo com SetActive(true) nele.
+            bool hasChildButtons =
+                (confirmButton != null && IsDescendant(confirmButton.transform, tapToPlaceUI.transform)) ||
+                (previewToggleButton != null && IsDescendant(previewToggleButton.transform, tapToPlaceUI.transform)) ||
+                (yawSlider != null && IsDescendant(yawSlider.transform, tapToPlaceUI.transform));
+
+            if (visible) {
+                if (!tapToPlaceUI.activeSelf) tapToPlaceUI.SetActive(true);
+                SetAllTapToPlaceUITextEnabled(true);
+                return;
+            }
+
+            if (!hasChildButtons) {
+                if (tapToPlaceUI.activeSelf) tapToPlaceUI.SetActive(false);
+                return;
+            }
+
+            // Mantém o container ativo, mas esconde só os textos.
+            if (!tapToPlaceUI.activeSelf) tapToPlaceUI.SetActive(true);
+            SetAllTapToPlaceUITextEnabled(false);
+        }
+
+        private void SetAllTapToPlaceUITextEnabled(bool enabled) {
+            if (tapToPlaceUI == null) return;
+
+            var tmps = tapToPlaceUI.GetComponentsInChildren<TMP_Text>(includeInactive: true);
+            for (int i = 0; i < tmps.Length; i++) {
+                if (tmps[i] == null) continue;
+                var tr = tmps[i].transform;
+                if (confirmButton != null && IsDescendant(tr, confirmButton.transform)) continue;
+                if (previewToggleButton != null && IsDescendant(tr, previewToggleButton.transform)) continue;
+                if (yawSlider != null && IsDescendant(tr, yawSlider.transform)) continue;
+                tmps[i].enabled = enabled;
+            }
+
+            var legacy = tapToPlaceUI.GetComponentsInChildren<Text>(includeInactive: true);
+            for (int i = 0; i < legacy.Length; i++) {
+                if (legacy[i] == null) continue;
+                var tr = legacy[i].transform;
+                if (confirmButton != null && IsDescendant(tr, confirmButton.transform)) continue;
+                if (previewToggleButton != null && IsDescendant(tr, previewToggleButton.transform)) continue;
+                if (yawSlider != null && IsDescendant(tr, yawSlider.transform)) continue;
+                legacy[i].enabled = enabled;
+            }
+        }
+
+        private bool IsDescendant(Transform possibleChild, Transform possibleAncestor) {
+            if (possibleChild == null || possibleAncestor == null) return false;
+            Transform current = possibleChild;
+            while (current != null) {
+                if (current == possibleAncestor) return true;
+                current = current.parent;
+            }
+            return false;
         }
 
         private void MaybeLogDebug(string phase, string extra) {
@@ -545,6 +900,11 @@ namespace SavitGame.AR {
                     RecenterInstanceToPose(spawnedScene, finalPose);
                 }
 
+                if (snapToSurface) {
+                    // Assenta a instância na superfície. (finalPose.position já inclui ghostVerticalOffset.)
+                    LiftRootToSurfaceY(spawnedScene, finalPose.position.y);
+                }
+
                 if (makePlacedRigidbodiesKinematic) {
                     MakeAllRigidbodiesKinematic(spawnedScene);
                 }
@@ -561,9 +921,12 @@ namespace SavitGame.AR {
                 isPlaced = true;
                 s_globalPlacementDone = true;
                 placementAllowed = false;
+                isGhostFrozenForPreview = false;
 
                 if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(false);
                 if (confirmButton != null) confirmButton.SetActive(false);
+                if (previewToggleButton != null) previewToggleButton.SetActive(false);
+                if (yawSlider != null) yawSlider.SetActive(false);
 
                 // Desativar detecção de novos planos para performance
                 if (planeManager != null) {
@@ -775,6 +1138,17 @@ namespace SavitGame.AR {
             root.transform.position += delta;
         }
 
+        private void LiftRootToSurfaceY(GameObject root, float surfaceY) {
+            if (root == null) return;
+            if (!TryGetCombinedRendererBounds(root, out Bounds bounds)) return;
+
+            // Se o objeto está "entrando" na superfície, levanta até o minY encostar no surfaceY.
+            float delta = surfaceY - bounds.min.y;
+            if (delta > 0f) {
+                root.transform.position += Vector3.up * (delta + Mathf.Max(0f, surfaceSnapPadding));
+            }
+        }
+
         private bool TryGetCombinedRendererBounds(GameObject root, out Bounds combined) {
             var renderers = root.GetComponentsInChildren<Renderer>(includeInactive: true);
             bool hasBounds = false;
@@ -856,6 +1230,11 @@ namespace SavitGame.AR {
             planePoseIsValid = false;
             hasGhostRootOffsetLocal = false;
 
+            isGhostFrozenForPreview = false;
+            hasFrozenGhostPose = false;
+
+            yawOffsetDegrees = 0f;
+
             confirmInProgress = false;
             s_globalPlacementDone = false;
             s_lastConfirmFrame = -1;
@@ -866,6 +1245,10 @@ namespace SavitGame.AR {
 
             if (tapToPlaceUI != null)  tapToPlaceUI.SetActive(true);
             if (confirmButton != null) confirmButton.SetActive(false);
+            if (previewToggleButton != null) previewToggleButton.SetActive(false);
+            if (yawSlider != null) yawSlider.SetActive(false);
+
+            UpdatePreviewToggleButtonLabel();
 
             // O ARGameManager decide quando o placement deve voltar a ficar ativo (estado Placing).
             placementAllowed = false;

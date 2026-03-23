@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace SavitGame.AR {
     /// <summary>
@@ -12,11 +13,17 @@ namespace SavitGame.AR {
         [Tooltip("Cor do ghost — o alpha controla a transparência (0.4 = 40%)")]
         public Color ghostColor = new Color(0.4f, 0.7f, 1f, 0.4f);
 
+        private readonly Dictionary<Renderer, Material[]> originalSharedMaterials = new Dictionary<Renderer, Material[]>();
+        private Material ghostMat;
+        private bool ghostEnabled = true;
+
         private void Awake() {
             // Ativa todos os filhos antes de aplicar materiais
             // (necessário pois ARPartsManager pode ter desativado os objetos)
             ActivateAllChildren();
-            ApplyGhostMaterials();
+
+            CacheOriginalMaterials();
+            SetGhostEnabled(true);
         }
 
         private void ActivateAllChildren() {
@@ -27,20 +34,63 @@ namespace SavitGame.AR {
             }
         }
 
-        private void ApplyGhostMaterials() {
-            Material ghostMat = CreateGhostMaterial();
+        public void SetGhostEnabled(bool enabled) {
+            ghostEnabled = enabled;
 
-            // Pega todos os MeshRenderers (agora todos já estão ativos)
-            var renderers = GetComponentsInChildren<MeshRenderer>(includeInactive: false);
-            foreach (var rend in renderers) {
-                // Substitui todos os slots de material pelo ghost
-                var mats = new Material[rend.sharedMaterials.Length];
-                for (int i = 0; i < mats.Length; i++)
-                    mats[i] = ghostMat;
-                rend.materials = mats;
+            if (enabled) {
+                ApplyGhostMaterials();
+            } else {
+                RestoreOriginalMaterials();
+            }
+        }
+
+        public bool IsGhostEnabled() => ghostEnabled;
+
+        private void CacheOriginalMaterials() {
+            originalSharedMaterials.Clear();
+
+            // Cacheia todos os Renderers relevantes (mesh + skinned) do prefab.
+            var renderers = GetComponentsInChildren<Renderer>(includeInactive: true);
+            foreach (var r in renderers) {
+                if (r == null) continue;
+                if (r is MeshRenderer || r is SkinnedMeshRenderer) {
+                    originalSharedMaterials[r] = r.sharedMaterials;
+                }
+            }
+        }
+
+        private void ApplyGhostMaterials() {
+            if (ghostMat == null) ghostMat = CreateGhostMaterial();
+
+            int applied = 0;
+            foreach (var kv in originalSharedMaterials) {
+                var rend = kv.Key;
+                if (rend == null) continue;
+
+                var original = kv.Value;
+                if (original == null) continue;
+
+                // Substitui todos os slots de material pelo ghost.
+                var mats = new Material[original.Length];
+                for (int i = 0; i < mats.Length; i++) mats[i] = ghostMat;
+                rend.sharedMaterials = mats;
+                applied++;
             }
 
-            Debug.Log($"[GhostPreview] Material ghost aplicado em {renderers.Length} renderers.");
+            Debug.Log($"[GhostPreview] Material ghost aplicado em {applied} renderers.");
+        }
+
+        private void RestoreOriginalMaterials() {
+            int restored = 0;
+            foreach (var kv in originalSharedMaterials) {
+                var rend = kv.Key;
+                if (rend == null) continue;
+
+                rend.sharedMaterials = kv.Value;
+                restored++;
+            }
+
+            Debug.Log($"[GhostPreview] Materiais originais restaurados em {restored} renderers.");
         }
 
         private Material CreateGhostMaterial() {
