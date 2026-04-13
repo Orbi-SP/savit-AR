@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.Events;
@@ -8,6 +10,8 @@ using UnityEngine.InputSystem;
 using Unity.XR.CoreUtils;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.XR.Management;
+using UnityEngine.Rendering;
 
 namespace SavitGame.AR {
     public class ARPlacementManager : MonoBehaviour {
@@ -23,6 +27,10 @@ namespace SavitGame.AR {
 
         [Tooltip("Prefab ghost (duplicata do GameScenePrefab + componente GhostPreview)")]
         public GameObject ghostScenePrefab;
+
+        [Header("Performance / Estabilidade")]
+        [Tooltip("Se true, reaproveita o ghost (GameScenePreviewPrefab) como a cena final ao confirmar. Isso evita instanciar um segundo prefab pesado no Android, reduzindo pico de memória e risco de o app ser encerrado pelo sistema.")]
+        public bool reuseGhostAsPlacedScene = true;
 
         [Header("UI")]
         public GameObject tapToPlaceUI;      // texto "Aponte para uma superfície"
@@ -126,6 +134,9 @@ namespace SavitGame.AR {
         private ARAnchorManager anchorManager;
         private ARAnchor spawnedAnchor;
 
+        private AROcclusionManager occlusionManager;
+        private ARShaderOcclusion shaderOcclusion;
+
         private float nextDebugLogTime = 0f;
         private Vector2 lastRaycastScreenCenter;
         private float nextPlacedDebugLogTime = 0f;
@@ -147,6 +158,7 @@ namespace SavitGame.AR {
 
             ResolveManagersIfNeeded();
             ResolveAnchorManagerIfNeeded();
+            ResolveOcclusionIfNeeded();
             ResolvePlacementCamera();
             ResolveUIRefsIfNeeded();
 
@@ -162,6 +174,7 @@ namespace SavitGame.AR {
         private void Start() {
             ResolveManagersIfNeeded();
             ResolveAnchorManagerIfNeeded();
+            ResolveOcclusionIfNeeded();
             ResolvePlacementCamera();
             ResolveUIRefsIfNeeded();
 
@@ -184,12 +197,236 @@ namespace SavitGame.AR {
 
             EnsureYawSliderSetup();
 
+            if (debugLogs) {
+                // Dá tempo do subsistema + SRP inicializarem e permite ver se o RP troca após alguns frames.
+                StartCoroutine(LogOcclusionStatusLoop(durationSeconds: 12f, intervalSeconds: 2f));
+            }
+
             if (confirmButton == null) {
                 Debug.LogWarning("ARPlacementManager: confirmButton (Colocar aqui) não está atribuído/encontrado. Arraste o GameObject do botão no campo 'Confirm Button'.");
             }
 
             // Por padrão, o placement só fica ativo quando o ARGameManager entrar no estado Placing.
             placementAllowed = false;
+        }
+
+        private IEnumerator LogOcclusionStatusLoop(float durationSeconds, float intervalSeconds) {
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start <= durationSeconds) {
+                LogOcclusionStatus();
+                yield return new WaitForSeconds(intervalSeconds);
+            }
+        }
+
+        private void ResolveOcclusionIfNeeded() {
+            if (occlusionManager == null)
+                occlusionManager = FindFirstObjectByType<AROcclusionManager>();
+
+            // Preferência: colocar na AR Camera (onde normalmente ficam ARCameraManager/ARCameraBackground).
+            if (occlusionManager == null) {
+                var camMgr = FindFirstObjectByType<ARCameraManager>();
+                if (camMgr != null) {
+                    occlusionManager = camMgr.GetComponent<AROcclusionManager>();
+                    if (occlusionManager == null)
+                        occlusionManager = camMgr.gameObject.AddComponent<AROcclusionManager>();
+                }
+            }
+
+            // Fallback: XROrigin
+            if (occlusionManager == null) {
+                var xrOrigin = FindFirstObjectByType<XROrigin>();
+                if (xrOrigin != null) {
+                    occlusionManager = xrOrigin.GetComponent<AROcclusionManager>();
+                    if (occlusionManager == null)
+                        occlusionManager = xrOrigin.gameObject.AddComponent<AROcclusionManager>();
+                }
+            }
+
+            if (occlusionManager == null) {
+                if (debugLogs) Debug.LogWarning("[ARPlacementDebug] AROcclusionManager não encontrado e não foi possível criar (sem ARCameraManager/XROrigin)." );
+                return;
+            }
+
+            // Configurações recomendadas para ARCore Depth (Android).
+            occlusionManager.requestedOcclusionPreferenceMode = OcclusionPreferenceMode.PreferEnvironmentOcclusion;
+            occlusionManager.requestedEnvironmentDepthMode = EnvironmentDepthMode.Best;
+            occlusionManager.environmentDepthTemporalSmoothingRequested = true;
+
+            // Em Android, human segmentation normalmente não existe; mantém desligado.
+            occlusionManager.requestedHumanDepthMode = HumanSegmentationDepthMode.Disabled;
+            occlusionManager.requestedHumanStencilMode = HumanSegmentationStencilMode.Disabled;
+
+            // Importante (ARCore/URP): ARShaderOcclusion NÃO "liga" oclusão por si só.
+            // Além disso, quando habilitado, ele pode fazer o ARCameraBackground ignorar updates
+            // de occlusion frame dependendo do modo de render, quebrando a oclusão de depth.
+            // Para ARCore, preferimos o caminho padrão: AROcclusionManager + ARCameraBackground
+            // (o shader do background escreve SV_Depth quando env depth está habilitado).
+            shaderOcclusion = occlusionManager.GetComponent<ARShaderOcclusion>();
+            if (shaderOcclusion != null && IsAndroidWithARCoreActive()) {
+                if (shaderOcclusion.enabled) {
+                    shaderOcclusion.enabled = false;
+                    if (debugLogs) Debug.LogWarning("[ARPlacementDebug] ARShaderOcclusion desabilitado em runtime (Android/ARCore) para não bloquear o path de Environment Depth via ARCameraBackground.");
+                }
+            }
+
+            // Também garante no GO da ARCameraBackground (é onde o ARCameraBackground checa esse componente).
+            if (IsAndroidWithARCoreActive()) {
+                var camBg = FindFirstObjectByType<ARCameraBackground>();
+                if (camBg != null) {
+                    var shaderOccOnCam = camBg.GetComponent<ARShaderOcclusion>();
+                    if (shaderOccOnCam != null && shaderOccOnCam.enabled) {
+                        shaderOccOnCam.enabled = false;
+                        if (debugLogs) Debug.LogWarning("[ARPlacementDebug] ARShaderOcclusion desabilitado no GO da ARCameraBackground (Android/ARCore)." );
+                    }
+                }
+            }
+
+            if (debugLogs) {
+                Debug.Log($"[ARPlacementDebug] Occlusion setup go='{occlusionManager.gameObject.name}' reqEnvDepth={occlusionManager.requestedEnvironmentDepthMode} reqPref={occlusionManager.requestedOcclusionPreferenceMode} smoothingReq={occlusionManager.environmentDepthTemporalSmoothingRequested}");
+            }
+        }
+
+        private static bool IsAndroidWithARCoreActive() {
+            if (Application.platform != RuntimePlatform.Android)
+                return false;
+
+            // XR Management loader name check (robusto o suficiente para distinguir ARCore em runtime).
+            var loader = XRGeneralSettings.Instance?.Manager?.activeLoader;
+            if (loader == null)
+                return true; // Android build AR: assume ARCore se loader ainda não está pronto.
+
+            var fullName = loader.GetType().FullName;
+            return !string.IsNullOrEmpty(fullName) && fullName.IndexOf("ARCore", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private void LogOcclusionStatus() {
+            if (!debugLogs) return;
+            if (occlusionManager == null) occlusionManager = FindFirstObjectByType<AROcclusionManager>();
+            if (occlusionManager == null) {
+                Debug.LogWarning("[ARPlacementDebug] Occlusion status: sem AROcclusionManager na cena.");
+                return;
+            }
+
+            // URP note: em URP 7+ o ARCameraBackground requer ARBackgroundRendererFeature no Renderer.
+            // Sem esse feature, o background pode até aparecer (dependendo do setup), mas a oclusão por depth
+            // frequentemente não escreve no depth buffer e "parece que não funciona".
+            int qIndex = -1;
+            string qName = "n/a";
+            try {
+                qIndex = QualitySettings.GetQualityLevel();
+                var names = QualitySettings.names;
+                if (names != null && qIndex >= 0 && qIndex < names.Length) qName = names[qIndex];
+            }
+            catch { }
+
+            RenderPipelineAsset rpCurrent = null;
+            RenderPipelineAsset rpDefault = null;
+            RenderPipelineAsset rpQuality = null;
+            string rpInfo = "n/a";
+            string rpSources = "";
+            string arBgFeatureInfo = "n/a";
+            try {
+                rpCurrent = GraphicsSettings.currentRenderPipeline;
+                rpDefault = GraphicsSettings.defaultRenderPipeline;
+
+                // QualitySettings.renderPipeline existe em versões SRP, mas usa reflection pra ser resiliente.
+                var rpProp = typeof(QualitySettings).GetProperty("renderPipeline", BindingFlags.Static | BindingFlags.Public);
+                if (rpProp != null) {
+                    rpQuality = rpProp.GetValue(null) as RenderPipelineAsset;
+                }
+
+                rpInfo = (rpCurrent ?? rpQuality ?? rpDefault) == null ? "Built-in" : (rpCurrent ?? rpQuality ?? rpDefault).GetType().Name;
+                rpSources = $"rpCur={(rpCurrent == null ? "null" : rpCurrent.GetType().Name)} rpQual={(rpQuality == null ? "null" : rpQuality.GetType().Name)} rpDef={(rpDefault == null ? "null" : rpDefault.GetType().Name)}";
+
+                bool hasArBackgroundFeature = false;
+
+                var rpForIntrospection = rpCurrent ?? rpQuality ?? rpDefault;
+                if (rpForIntrospection != null) {
+                    // UniversalRenderPipelineAsset.GetRenderer(int) existe em URP, mas não vamos depender de referência direta.
+                    var getRendererMethod = rpForIntrospection.GetType().GetMethod(
+                        "GetRenderer",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                        binder: null,
+                        types: new[] { typeof(int) },
+                        modifiers: null
+                    );
+
+                    object rendererObj = null;
+                    if (getRendererMethod != null) {
+                        rendererObj = getRendererMethod.Invoke(rpForIntrospection, new object[] { 0 });
+                    }
+
+                    if (rendererObj != null) {
+                        // ScriptableRenderer.rendererFeatures (public) existe em versões recentes, mas pode variar.
+                        var featuresProp = rendererObj.GetType().GetProperty(
+                            "rendererFeatures",
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                        );
+
+                        if (featuresProp != null) {
+                            var featuresEnumerable = featuresProp.GetValue(rendererObj) as System.Collections.IEnumerable;
+                            if (featuresEnumerable != null) {
+                                foreach (var feature in featuresEnumerable) {
+                                    if (feature == null) continue;
+                                    var t = feature.GetType();
+                                    var fullName = t.FullName ?? t.Name;
+                                    if (fullName.IndexOf("ARBackgroundRendererFeature", System.StringComparison.OrdinalIgnoreCase) >= 0) {
+                                        hasArBackgroundFeature = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                arBgFeatureInfo = hasArBackgroundFeature ? "present" : "missing";
+            }
+            catch (System.Exception ex) {
+                arBgFeatureInfo = $"err:{ex.GetType().Name}";
+            }
+
+            Texture envTex;
+            bool hasEnvTex = occlusionManager.TryGetEnvironmentDepthTexture(out envTex);
+            if (!hasEnvTex) envTex = null;
+            string envTexInfo = envTex == null ? "null" : $"{envTex.width}x{envTex.height} fmt={envTex.graphicsFormat}";
+
+            // Se a textura GPU não aparece, tenta adquirir a CPU image só pra diagnosticar se o depth está vindo do subsistema.
+            string envCpuInfo = "n/a";
+            if (envTex == null) {
+                try {
+                    if (occlusionManager.TryAcquireEnvironmentDepthCpuImage(out var cpuImage)) {
+                        envCpuInfo = $"cpuDepth={cpuImage.width}x{cpuImage.height} fmt={cpuImage.format}";
+                        cpuImage.Dispose();
+                    }
+                    else {
+                        envCpuInfo = "cpuDepth=null";
+                    }
+                }
+                catch (System.Exception ex) {
+                    envCpuInfo = $"cpuDepth=err:{ex.GetType().Name}";
+                }
+            }
+
+            var camMgr = FindFirstObjectByType<ARCameraManager>();
+            var mat = camMgr != null ? camMgr.cameraMaterial : null;
+            string matInfo = mat == null ? "null" : $"'{mat.shader?.name}'";
+            var camBg = FindFirstObjectByType<ARCameraBackground>();
+            string renderModeInfo = camMgr == null ? "n/a" : camMgr.currentRenderingMode.ToString();
+            string bgRenderModeInfo = camBg == null ? "n/a" : camBg.currentRenderingMode.ToString();
+            bool kwDepth = mat != null && mat.IsKeywordEnabled("ARCORE_ENVIRONMENT_DEPTH_ENABLED");
+            var envDepthOnMat = mat != null && mat.HasTexture("_EnvironmentDepth") ? mat.GetTexture("_EnvironmentDepth") : null;
+            string envDepthTexOnMatInfo = envDepthOnMat == null ? "null" : $"{envDepthOnMat.width}x{envDepthOnMat.height} (mat _EnvironmentDepth)";
+
+            var shaderOcc = occlusionManager.GetComponent<ARShaderOcclusion>();
+            string shaderOccInfo = shaderOcc == null ? "none" : (shaderOcc.enabled ? $"enabled mode={shaderOcc.occlusionShaderMode}" : "disabled");
+
+            Debug.Log(
+                $"[ARPlacementDebug] Occlusion status currentEnvDepth={occlusionManager.currentEnvironmentDepthMode} " +
+                $"currentPref={occlusionManager.currentOcclusionPreferenceMode} smoothingEnabled={occlusionManager.environmentDepthTemporalSmoothingEnabled} " +
+                $"envDepthTex={envTexInfo} renderMode(camMgr)={renderModeInfo} renderMode(camBg)={bgRenderModeInfo} cameraMat={matInfo} kw(ARCORE_ENVIRONMENT_DEPTH_ENABLED)={kwDepth} matEnvDepth={envDepthTexOnMatInfo} shaderOcc={shaderOccInfo} rp={rpInfo} arBgFeature={arBgFeatureInfo}"
+                + $" q={qIndex}:{qName} {rpSources} {envCpuInfo}"
+            );
         }
 
         private Slider GetYawSliderComponent() {
@@ -868,23 +1105,49 @@ namespace SavitGame.AR {
                 }
 
                 // Remove o ghost
-                if (ghostInstance != null) {
-                    Destroy(ghostInstance);
-                    ghostInstance = null;
+                // Spawna a cena real
+                // Se a pose veio do ghost, instancia o ROOT no mesmo offset do ghost para garantir 1:1.
+                Vector3 spawnRootPos = finalPose.position;
+                Quaternion spawnRootRot = finalPose.rotation;
+                if (poseCameFromGhost && hasGhostRootOffsetLocal) {
+                    spawnRootPos = finalPose.position + (spawnRootRot * ghostRootOffsetLocal);
                 }
 
-            // Spawna a cena real
-            // Se a pose veio do ghost, instancia o ROOT no mesmo offset do ghost para garantir 1:1.
-            Vector3 spawnRootPos = finalPose.position;
-            Quaternion spawnRootRot = finalPose.rotation;
-            if (poseCameFromGhost && hasGhostRootOffsetLocal) {
-                spawnRootPos = finalPose.position + (spawnRootRot * ghostRootOffsetLocal);
-            }
+                // Importante (Android): evitar um pico de memória instanciando um segundo prefab pesado.
+                // Quando possível, reaproveita o ghost como instância final.
+                bool canReuseGhost = reuseGhostAsPlacedScene && ghostInstance != null;
+                if (canReuseGhost) {
+                    spawnedScene = ghostInstance;
+                    ghostInstance = null;
 
-                spawnedScene = Instantiate(gameScenePrefab, spawnRootPos, spawnRootRot);
-                if (spawnedScene == null) {
-                    Debug.LogError("ARPlacementManager: falha ao instanciar gameScenePrefab.");
-                    return;
+                    // Garante pose final do root.
+                    spawnedScene.transform.SetPositionAndRotation(spawnRootPos, spawnRootRot);
+
+                    // Restaura materiais originais (remove aparência translúcida) e remove o componente.
+                    var ghostPreview = spawnedScene.GetComponent<GhostPreview>();
+                    if (ghostPreview != null) {
+                        ghostPreview.SetGhostEnabled(false);
+                        Destroy(ghostPreview);
+                    }
+
+                    // O ghost desativa vários behaviours para virar apenas visual. Aqui reabilitamos para gameplay.
+                    EnableAllBehavioursForPlacedScene(spawnedScene);
+
+                    if (debugLogs) {
+                        Debug.Log("[ARPlacementDebug] Reutilizando ghost como cena final (evita Instantiate do prefab real).");
+                    }
+                } else {
+                    // Remove ghost antigo antes de instanciar a cena real.
+                    if (ghostInstance != null) {
+                        Destroy(ghostInstance);
+                        ghostInstance = null;
+                    }
+
+                    spawnedScene = Instantiate(gameScenePrefab, spawnRootPos, spawnRootRot);
+                    if (spawnedScene == null) {
+                        Debug.LogError("ARPlacementManager: falha ao instanciar gameScenePrefab.");
+                        return;
+                    }
                 }
 
                 if (instanceScale != 1f)
@@ -949,6 +1212,36 @@ namespace SavitGame.AR {
                 }
 
                 Interlocked.Exchange(ref s_globalConfirmLock, 0);
+            }
+        }
+
+        private void EnableAllBehavioursForPlacedScene(GameObject root) {
+            if (root == null) return;
+
+            var behaviours = root.GetComponentsInChildren<Behaviour>(includeInactive: true);
+            foreach (var b in behaviours) {
+                if (b == null) continue;
+
+                // Não reabilita câmeras/canvases/listeners internos do prefab para não conflitar com AR.
+                if (b is Camera || b is AudioListener || b is Canvas) {
+                    b.enabled = false;
+                    continue;
+                }
+
+                // GhostPreview será removido no placement.
+                if (b is GhostPreview) {
+                    b.enabled = false;
+                    continue;
+                }
+
+                // Scripts que já causaram crash/log spam no pacote original.
+                string typeName = b.GetType().Name;
+                if (typeName == "SampleScene" || typeName == "CameraFeed") {
+                    b.enabled = false;
+                    continue;
+                }
+
+                b.enabled = true;
             }
         }
 

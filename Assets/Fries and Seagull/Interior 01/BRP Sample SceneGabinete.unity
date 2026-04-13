@@ -942,6 +942,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 1
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &424645918
 GameObject:
   m_ObjectHideFlags: 0
@@ -1247,6 +1264,117 @@ RectTransform:
   m_AnchoredPosition: {x: -5, y: 0}
   m_SizeDelta: {x: -20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &684286790
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 684286794}
+  - component: {fileID: 684286793}
+  - component: {fileID: 684286792}
+  - component: {fileID: 684286791}
+  m_Layer: 0
+  m_Name: OcclusionTestCube
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!65 &684286791
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 684286790}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &684286792
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 684286790}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: f5b3b860cd16aec4398393945196e3da, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &684286793
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 684286790}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &684286794
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 684286790}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.29443, y: 0.5, z: 0.29503}
+  m_LocalScale: {x: 0.08, y: 0.08, z: 0.08}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &691339219 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7579001743718493479, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
@@ -1659,6 +1787,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  m_IsGlobal: 1
+  priority: 0
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 0}
 --- !u!4 &832575519
 Transform:
   m_ObjectHideFlags: 0
@@ -2042,6 +2175,7 @@ MonoBehaviour:
   placementCamera: {fileID: 1315549737}
   gameScenePrefab: {fileID: 860321811777208607, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
   ghostScenePrefab: {fileID: 5716423169778952079, guid: 91ccff77bb90d1d48a70173c9ac52d52, type: 3}
+  reuseGhostAsPlacedScene: 1
   tapToPlaceUI: {fileID: 468361034}
   confirmButton: {fileID: 424645918}
   previewToggleButton: {fileID: 1908341122}
@@ -2051,12 +2185,12 @@ MonoBehaviour:
   ghostFollowSpeed: 12
   ghostVerticalOffset: 0.005
   snapToSurface: 1
-  surfaceSnapPadding: 0.0015
+  surfaceSnapPadding: 0.17
   recenterByRenderBounds: 1
   useFallbackPoseWhenNoPlane: 1
   requirePlaneForPlacement: 1
   fallbackDistance: 0.65
-  instanceScale: 0.19
+  instanceScale: 0.09
   yawOffsetDegrees: 0
   yawStepDegrees: 15
   makePlacedRigidbodiesKinematic: 1
@@ -2090,7 +2224,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e5d96ec70e1aefd4d835e2850fd3c69e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SavitGame.AR.ARPlaneVisualizer
-  showPlanes: 1
+  showPlanes: 0
   planeMaterial: {fileID: 2100000, guid: c2b2570df30f96f45a6a350d5861f015, type: 2}
 --- !u!1 &999921793
 GameObject:
@@ -2447,6 +2581,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 1
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1274363725
 GameObject:
   m_ObjectHideFlags: 0
@@ -2569,6 +2720,11 @@ GameObject:
   - component: {fileID: 1315549734}
   - component: {fileID: 1315549733}
   - component: {fileID: 1315549738}
+  - component: {fileID: 1315549739}
+  - component: {fileID: 1315549740}
+  - component: {fileID: 1315549741}
+  - component: {fileID: 1315549742}
+  - component: {fileID: 1315549743}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -2801,6 +2957,137 @@ MonoBehaviour:
   m_EnvironmentDepthMode: 3
   m_EnvironmentDepthTemporalSmoothing: 1
   m_OcclusionPreferenceMode: 0
+--- !u!114 &1315549739
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1315549731}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3be8fb9835084b3f83d6d0ae1c6bd876, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARShaderOcclusion
+  m_OcclusionManager: {fileID: 1315549738}
+  m_OcclusionShaderMode: 1
+  m_SoftOcclusionPreprocessShader: {fileID: 0}
+  m_AROcclusionSources: 1
+  m_HandsOcclusionMaterial: {fileID: 0}
+--- !u!114 &1315549740
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1315549731}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c4d4c6c6b154037a0d2d2d0f8799b64, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SavitGame.AR.PersonOcclusionMaskSource
+  maskTexture: {fileID: 0}
+  threshold: 0.262
+  invert: 0
+  flipY: 1
+  flipX: 0
+  rotation: 0
+  useArDisplayUvTransform: 0
+  arDisplayUvTransform0: {x: 1, y: 0, z: 0, w: 0}
+  arDisplayUvTransform1: {x: 0, y: 1, z: 0, w: 0}
+  enableOcclusion: 1
+--- !u!114 &1315549741
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1315549731}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a50b76f2d9a4a0a8d2e3e63cc2c5f1f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SavitGame.AR.MediaPipePersonMaskBridge
+  target: {fileID: 1315549740}
+  mediaPipeSolutionObject: {fileID: 0}
+  preferredComponentFullName: Mediapipe.Unity.SelfieSegmentation.SelfieSegmentationSolution
+  pollIntervalSeconds: 0.033
+--- !u!114 &1315549742
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1315549731}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2329f1c819e69d4aa1848611773a0d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SavitGame.AR.MediaPipeImageSegmenterMaskProvider
+  arCameraManager: {fileID: 1315549735}
+  maskSource: {fileID: 1315549740}
+  modelVariant: 0
+  delegateType: 0
+  inferenceHz: 6.8
+  maxInputDimension: 256
+  categoryIndex: 0
+  debugMaskLogging: 1
+  debugMaskLogIntervalSeconds: 1
+  mirrorMaskHorizontally: 0
+  forceFlipY: 1
+  forceFlipX: 0
+  rotation: 0
+  useArFrameDisplayUvTransform: 1
+  invertArFrameDisplayUvTransform: 1
+  autoDetectArDisplayUvDirection: 1
+  preferArDisplayUvTransformOverManual: 0
+  debugDisplayUvLogging: 1
+  arDisplayUvTranslationSource: 0
+  arDisplayUvMatrixPacking: 1
+--- !u!114 &1315549743
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1315549731}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1 &1343052990
 GameObject:
   m_ObjectHideFlags: 0
@@ -5054,3 +5341,4 @@ SceneRoots:
   - {fileID: 4897829354006814232}
   - {fileID: 4067311968946927106}
   - {fileID: 446995326500707947}
+  - {fileID: 684286794}

@@ -12,6 +12,17 @@
 /[Uu]ser[Ss]ettings/
 *.log
 
+# Unity recovery folder (can be large and not meant for VCS)
+/Assets/_Recovery/
+
+# MediaPipe Unity Plugin sample/tutorial assets (optional; keep repo smaller)
+/Assets/MediaPipeUnity/
+/Assets/MediaPipeUnity.meta
+
+# Prevent embedded packages from being accidentally committed (we use UPM Git/registry instead)
+/Packages/com.github.homuler.mediapipe/
+/Packages/com.unity.ugui/
+
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
 /[Mm]emoryCaptures/

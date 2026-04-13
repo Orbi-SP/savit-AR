@@ -39,6 +39,12 @@ namespace SavitGame.AR {
 
         private void OnEnable() {
             planeManager.trackablesChanged.AddListener(OnPlanesChanged);
+
+            // Aplica o estado atual também aos planos que já existiam antes
+            // do listener ser registrado (evita aparecer um mesh/material errado).
+            foreach (var plane in planeManager.trackables) {
+                ConfigurePlane(plane);
+            }
         }
 
         private void OnDisable() {

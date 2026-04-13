@@ -145,8 +145,8 @@ PlayerSettings:
   bundleVersion: 0.0.1
   preloadedAssets:
   - {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  - {fileID: 8920450674141204953, guid: bfa7018155d854f49843bb3d25f17074, type: 2}
   - {fileID: 5139317310751854908, guid: 48cf7f24c63c07444bf5f03f4800e5e2, type: 2}
+  - {fileID: 8920450674141204953, guid: bfa7018155d854f49843bb3d25f17074, type: 2}
   - {fileID: 11400000, guid: 0acd69796bff51345b4ebd997c9fa41d, type: 2}
   - {fileID: 4800000, guid: c9f956787b1d945e7b36e0516201fc76, type: 3}
   - {fileID: 4800000, guid: 0945859e5a1034c2cb6dce53cb4fb899, type: 3}
@@ -534,7 +534,10 @@ PlayerSettings:
       m_Height: 720
       m_Kind: 1
       m_SubKind: 
-  m_BuildTargetBatching: []
+  m_BuildTargetBatching:
+  - m_BuildTarget: Android
+    m_StaticBatching: 1
+    m_DynamicBatching: 0
   m_BuildTargetShaderSettings: []
   m_BuildTargetGraphicsJobs: []
   m_BuildTargetGraphicsJobMode: []
