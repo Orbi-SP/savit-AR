@@ -1,13 +1,14 @@
 {
   "dependencies": {
     "com.github.homuler.mediapipe": {
-      "version": "https://github.com/homuler/MediaPipeUnityPlugin.git?path=Packages/com.github.homuler.mediapipe#v0.16.3",
+      "version": "git+https://github.com/homuler/MediaPipeUnityPlugin.git?path=Packages/com.github.homuler.mediapipe#v0.16.3",
       "depth": 0,
       "source": "git",
       "dependencies": {
         "com.unity.ugui": "1.0.0",
         "com.unity.test-framework": "1.0.0"
-      }
+      },
+      "hash": "cf4c11d8eef724fe24111b7cd795d55ba490aeec"
     },
     "com.unity.ai.navigation": {
       "version": "2.0.9",
@@ -213,12 +214,11 @@
     "com.unity.ugui": {
       "version": "2.0.0",
       "depth": 0,
-      "source": "registry",
+      "source": "builtin",
       "dependencies": {
         "com.unity.modules.ui": "1.0.0",
         "com.unity.modules.imgui": "1.0.0"
-      },
-      "url": "https://packages.unity.com"
+      }
     },
     "com.unity.visualscripting": {
       "version": "1.9.7",
