@@ -4,32 +4,49 @@ using UnityEngine.Networking;
 
 public class Api : MonoBehaviour
 {
-    [Header("Configurações API")]
+    [Header("On-Device Hand Tracking (preferencial no celular)")]
+    [Tooltip("Arraste o MediaPipeHandTracker aqui. Se presente, usa detecção local; senão, usa API HTTP.")]
+    public SavitGame.AR.MediaPipeHandTracker handTracker;
+
+    [Header("Configurações API HTTP (fallback para PC/Editor)")]
     public string apiURL = "http://127.0.0.1:5000";
     public CameraFeed cameraFeed;
 
     [Header("Objeto a controlar (apenas se a cena exigir)")]
-    public GameObject objectToMove; // use apenas em cenas que o Api controla (ex.: RAM)
+    public GameObject objectToMove;
     public enum SceneType { RAM, Gabinete, OutraCena }
     public SceneType currentScene = SceneType.Gabinete;
 
     // ==== Saídas de gesto para outros scripts ====
     private bool isHolding = false;
     private string currentSide = "center";
-    public bool IsHolding => isHolding;          // true = mão fechada
-    public string CurrentSide => currentSide;    // "left" | "center" | "right"
-    public GameObject currentHeld;               // atribuído pelo seu pickup quando pegar um objeto
+    private float handPosX = 0.5f;
+    private float handPosY = 0.5f;
+
+    public bool IsHolding => isHolding;
+    public string CurrentSide => currentSide;
+    public float HandPositionX => handPosX;
+    public float HandPositionY => handPosY;
+    public GameObject currentHeld;
     bool prevHolding = false;
 
     // ==== Estado interno (só usado se o Api controla o objeto) ====
     private Vector3 originalPos;
     private Quaternion originalRot;
     private float accumulatedZ;
-    private bool driveTransform;   // se o Api deve mexer no transform (ex.: cena RAM)
+    private bool driveTransform;
+
+    /// <summary>
+    /// True when using on-device MediaPipe HandTracker (no HTTP needed).
+    /// </summary>
+    public bool IsOnDevice => handTracker != null && handTracker.enabled && handTracker.gameObject.activeInHierarchy;
 
     void Start()
     {
-        // Define se o Api vai dirigir o transform nesta cena
+        // Tenta encontrar o hand tracker automaticamente se não foi atribuído
+        if (handTracker == null)
+            handTracker = FindFirstObjectByType<SavitGame.AR.MediaPipeHandTracker>();
+
         driveTransform = (currentScene == SceneType.RAM);
 
         if (driveTransform && objectToMove != null)
@@ -39,13 +56,83 @@ public class Api : MonoBehaviour
             accumulatedZ = originalPos.z;
         }
 
-        StartCoroutine(SendToApiRoutine());
+        // Só inicia polling HTTP se não tiver tracker on-device
+        if (!IsOnDevice)
+        {
+            Debug.Log("[Api] Sem HandTracker on-device — usando fallback HTTP para " + apiURL);
+            StartCoroutine(SendToApiRoutine());
+        }
+        else
+        {
+            Debug.Log("[Api] Usando MediaPipe HandTracker on-device (sem servidor HTTP).");
+        }
     }
+
+    void Update()
+    {
+        // Se usando on-device, lê dados do tracker local a cada frame
+        if (IsOnDevice)
+        {
+            isHolding = handTracker.IsHolding;
+            currentSide = handTracker.CurrentSide;
+            handPosX = handTracker.HandPositionX;
+            handPosY = handTracker.HandPositionY;
+        }
+
+        // Notifica liberação (transição prevHolding -> !isHolding)
+        if (prevHolding && !isHolding)
+        {
+            if (currentHeld != null)
+            {
+                var releasable = currentHeld.GetComponent<IReleasable>();
+                if (releasable != null)
+                {
+                    releasable.OnRelease();
+                }
+            }
+        }
+
+        prevHolding = isHolding;
+
+        // Se o Api não deve mover o objectToMove, saia cedo
+        if (!driveTransform) return;
+        if (objectToMove == null) return;
+
+        // Movimento simples baseado em currentSide / isHolding
+        if (currentSide == "center")
+            accumulatedZ = Mathf.Lerp(accumulatedZ, originalPos.z, Time.deltaTime * 5f);
+        else if (currentSide == "right")
+            accumulatedZ += 0.3f;
+        else if (currentSide == "left")
+            accumulatedZ -= 0.3f;
+
+        float targetY = isHolding ? 5.5f : originalPos.y;
+        Vector3 targetPos = new Vector3(originalPos.x, targetY, accumulatedZ);
+
+        objectToMove.transform.position =
+            Vector3.Lerp(objectToMove.transform.position, targetPos, Time.deltaTime * 5f);
+
+        Quaternion targetRot = isHolding
+            ? Quaternion.Euler(-90f, originalRot.eulerAngles.y, originalRot.eulerAngles.z)
+            : originalRot;
+
+        objectToMove.transform.rotation =
+            Quaternion.Lerp(objectToMove.transform.rotation, targetRot, Time.deltaTime * 5f);
+    }
+
+    // ──── Fallback HTTP (usado apenas no PC/Editor) ────────────────────────
 
     IEnumerator SendToApiRoutine()
     {
         while (true)
         {
+            // Se o tracker on-device ficou disponível, para o polling HTTP
+            if (IsOnDevice)
+            {
+                Debug.Log("[Api] HandTracker on-device detectado — parando polling HTTP.");
+                yield break;
+            }
+
             if (cameraFeed == null)
             {
                 yield return new WaitForSeconds(0.5f);
@@ -72,70 +159,31 @@ public class Api : MonoBehaviour
             if (www.result == UnityWebRequest.Result.Success)
             {
                 string response = www.downloadHandler.text.Trim().ToLower();
-                // exemplos: "hold left", "free right", "free center"
                 string[] parts = response.Split(' ');
 
                 if (parts.Length >= 2)
                 {
                     isHolding = (parts[0] == "hold");
-                    currentSide = parts[1]; // "left"|"center"|"right"
+                    currentSide = parts[1];
                 }
                 else
                 {
                     isHolding = (response == "hold");
                     currentSide = "center";
                 }
+
+                // HTTP não retorna posição contínua — usar mapeamento discreto
+                if (currentSide == "left") handPosX = 0.15f;
+                else if (currentSide == "right") handPosX = 0.85f;
+                else handPosX = 0.5f;
+                handPosY = 0.5f;
             }
             else
             {
                 Debug.LogWarning("Erro na API: " + www.error);
             }
 
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSeconds(0.15f);
         }
-    }
-
-    void Update()
-    {
-        // Notifica liberação (transição prevHolding -> !isHolding)
-        if (prevHolding && !isHolding)
-        {
-            if (currentHeld != null)
-            {
-                // CHAME APENAS A INTERFACE
-                var releasable = currentHeld.GetComponent<IReleasable>();
-                if (releasable != null)
-                {
-                    releasable.OnRelease();
-                }
-            }
-        }
-
-        prevHolding = isHolding;
-
-        // Se o Api não deve mover o objectToMove, saia cedo
-        if (!driveTransform) return;
-        if (objectToMove == null) return;
-
-        // Movimento simples baseado em currentSide / isHolding (ajuste conforme necessário)
-        if (currentSide == "center")
-            accumulatedZ = Mathf.Lerp(accumulatedZ, originalPos.z, Time.deltaTime * 5f);
-        else if (currentSide == "right")
-            accumulatedZ += 0.3f;
-        else if (currentSide == "left")
-            accumulatedZ -= 0.3f;
-
-        float targetY = isHolding ? 5.5f : originalPos.y;
-        Vector3 targetPos = new Vector3(originalPos.x, targetY, accumulatedZ);
-
-        objectToMove.transform.position =
-            Vector3.Lerp(objectToMove.transform.position, targetPos, Time.deltaTime * 5f);
-
-        Quaternion targetRot = isHolding
-            ? Quaternion.Euler(-90f, originalRot.eulerAngles.y, originalRot.eulerAngles.z)
-            : originalRot;
-
-        objectToMove.transform.rotation =
-            Quaternion.Lerp(objectToMove.transform.rotation, targetRot, Time.deltaTime * 5f);
     }
 }

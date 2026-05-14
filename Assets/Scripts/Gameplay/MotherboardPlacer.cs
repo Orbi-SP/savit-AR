@@ -22,8 +22,7 @@ public class MotherboardPlacer : MonoBehaviour
     [Tooltip("Margem de tolerância no plano X/Z para encaixe.")]
     public float snapTolerance = 0.05f;
 
-    [Header("Debug")]
-    public bool drawSnapGizmo = true;   // liga/desliga gizmo
+
 
     private Vector3 originalPos;
     private Quaternion originalRot;
@@ -70,14 +69,17 @@ public class MotherboardPlacer : MonoBehaviour
         if (isSnapped || api == null) return;
 
         bool holding = api.IsHolding;
-        string side = api.CurrentSide;
 
-        // move lateral só enquanto segura
-        float dir = holding ? (side == "right" ? -1f : side == "left" ? +1f : 0f) : 0f;
-        accum += dir * moveSpeed * Time.deltaTime;
-
-        if (holding && side == "center")
+        // Posição contínua: mapeia HandPositionX (0-1) para os limites de movimento
+        if (holding)
+        {
+            float targetAccum = Mathf.Lerp(moveLimits.y, moveLimits.x, api.HandPositionX);
+            accum = Mathf.Lerp(accum, targetAccum, Time.deltaTime * 8f);
+        }
+        else
+        {
             accum = Mathf.Lerp(accum, 0f, Time.deltaTime * 5f);
+        }
 
         accum = Mathf.Clamp(accum, moveLimits.x, moveLimits.y);
 
@@ -91,18 +93,18 @@ public class MotherboardPlacer : MonoBehaviour
 
         // snap só ao SOLTAR e se estiver alinhado em X/Z com a zona
         if (prevHolding && !holding && IsAlignedXZ(transform.position))
-                {
-                    if (motherboardState != null && !motherboardState.HasRequiredMemory)
-                    {
-                        Debug.Log("Instale a memória RAM na placa antes de colocá-la no gabinete.");
-                        prevHolding = holding;
-                        return;
-                    }
-                    DoSnap();
-                    return;
-                }
+        {
+            if (motherboardState != null && !motherboardState.HasRequiredMemory)
+            {
+                Debug.Log("Instale a memória RAM na placa antes de colocá-la no gabinete.");
                 prevHolding = holding;
+                return;
             }
+            DoSnap();
+            return;
+        }
+        prevHolding = holding;
+    }
 
     // ✔️ Checagem em X/Z no espaço local da zona (NÃO multiplica por lossyScale)
     bool IsAlignedXZ(Vector3 worldPos)
@@ -181,24 +183,4 @@ public class MotherboardPlacer : MonoBehaviour
         Debug.Log("=== SwitchCameras FINALIZADO ===");
     }
 
-    void OnDrawGizmosSelected()
-    {
-        if (!drawSnapGizmo || snapZone == null) return;
-
-        // ⚠️ Não multiplica por lossyScale AQUI, pois a matrix já contém a escala
-        Gizmos.color = Color.green;
-        Matrix4x4 prev = Gizmos.matrix;
-        Gizmos.matrix = snapZone.transform.localToWorldMatrix;
-
-        // desenha um wire cube com tolerância extra no plano X/Z
-        Vector3 sizeWithTol = new Vector3(
-            snapZone.size.x + 2f * snapTolerance,
-            snapZone.size.y, // Y não importa pro teste, mas desenhamos pra visualizar
-            snapZone.size.z + 2f * snapTolerance
-        );
-
-        Gizmos.DrawWireCube(Vector3.zero, sizeWithTol);
-
-        Gizmos.matrix = prev;
-    }
 }

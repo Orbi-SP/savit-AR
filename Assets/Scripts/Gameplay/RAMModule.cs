@@ -50,15 +50,13 @@ public class RAMModule : MonoBehaviour, IReleasable
         if (isSnapped) return;
 
         bool holding = api.IsHolding;
-        string side = api.CurrentSide;
 
-        float dir = 0f;
         if (holding)
         {
-            if (side == "right") dir = -1f;
-            else if (side == "left") dir = +1f;
-
-            accum += dir * moveSpeed * Time.deltaTime;
+            // Posição contínua: mapeia HandPositionX (0-1) para os limites de movimento
+            // 0 = limite esquerdo (moveLimits.x), 1 = limite direito (moveLimits.y)
+            float targetAccum = Mathf.Lerp(moveLimits.y, moveLimits.x, api.HandPositionX);
+            accum = Mathf.Lerp(accum, targetAccum, Time.deltaTime * 8f);
         }
         else
         {
