@@ -30,6 +30,10 @@ public class RAMModule : MonoBehaviour, IReleasable
         originalLocalRot = transform.localRotation;
         accum = 0f;
 
+        // Auto-find Api se não atribuído no Inspector
+        if (api == null)
+            api = FindFirstObjectByType<Api>();
+
         // Esses objetos são movidos por script; física dinâmica aqui costuma causar jitter/"voar".
         var rb = GetComponent<Rigidbody>();
         if (rb != null)
@@ -39,9 +43,11 @@ public class RAMModule : MonoBehaviour, IReleasable
         }
 
         if (slots == null || slots.Length == 0)
-            slots = FindObjectsOfType<RAMSlot>();
+            slots = FindObjectsByType<RAMSlot>(FindObjectsSortMode.None);
 
         useAxisX = true;
+
+        Debug.Log($"[RAMModule] Start: api={(api != null ? "OK" : "NULL")} slots={slots?.Length ?? 0}");
     }
 
     void Update()

@@ -1,11 +1,12 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.XR.ARFoundation;
 
 public class Api : MonoBehaviour
 {
     [Header("On-Device Hand Tracking (preferencial no celular)")]
-    [Tooltip("Arraste o MediaPipeHandTracker aqui. Se presente, usa detecção local; senão, usa API HTTP.")]
+    [Tooltip("Auto-preenchido em runtime se vazio.")]
     public SavitGame.AR.MediaPipeHandTracker handTracker;
 
     [Header("Configurações API HTTP (fallback para PC/Editor)")]
@@ -15,7 +16,7 @@ public class Api : MonoBehaviour
     [Header("Objeto a controlar (apenas se a cena exigir)")]
     public GameObject objectToMove;
     public enum SceneType { RAM, Gabinete, OutraCena }
-    public SceneType currentScene = SceneType.Gabinete;
+    public SceneType currentScene = SceneType.RAM;
 
     // ==== Saídas de gesto para outros scripts ====
     private bool isHolding = false;
@@ -43,9 +44,29 @@ public class Api : MonoBehaviour
 
     void Start()
     {
-        // Tenta encontrar o hand tracker automaticamente se não foi atribuído
+        // ──── Auto-setup: encontra ou cria o HandTracker automaticamente ────
         if (handTracker == null)
             handTracker = FindFirstObjectByType<SavitGame.AR.MediaPipeHandTracker>();
+
+        // Se ainda não existe, tenta criar automaticamente no celular
+        if (handTracker == null)
+        {
+            var arCamMgr = FindFirstObjectByType<ARCameraManager>();
+            if (arCamMgr != null)
+            {
+                // Cria o MediaPipeHandTracker no mesmo GameObject do ARCameraManager
+                handTracker = arCamMgr.gameObject.AddComponent<SavitGame.AR.MediaPipeHandTracker>();
+                handTracker.arCameraManager = arCamMgr;
+                Debug.Log($"[Api] ✅ MediaPipeHandTracker CRIADO automaticamente em '{arCamMgr.gameObject.name}'");
+            }
+            else
+            {
+                Debug.LogWarning("[Api] ARCameraManager não encontrado — HandTracker não pode ser criado. Usando fallback HTTP.");
+            }
+        }
+
+        Debug.Log($"[Api] Start: handTracker={(handTracker != null ? handTracker.gameObject.name : "NULL")} " +
+                  $"IsOnDevice={IsOnDevice} currentScene={currentScene}");
 
         driveTransform = (currentScene == SceneType.RAM);
 

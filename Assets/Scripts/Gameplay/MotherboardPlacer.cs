@@ -40,6 +40,12 @@ public class MotherboardPlacer : MonoBehaviour
         originalLocalRot = transform.localRotation;
         accum = 0f;
 
+        // Auto-find referências se não atribuídas no Inspector
+        if (api == null)
+            api = FindFirstObjectByType<Api>();
+        if (motherboardState == null)
+            motherboardState = FindFirstObjectByType<MotherboardState>();
+
         // Movimentação é por script; física dinâmica aqui tende a dar instabilidade.
         var rb = GetComponent<Rigidbody>();
         if (rb != null)
@@ -62,6 +68,8 @@ public class MotherboardPlacer : MonoBehaviour
             desktopCamera.enabled = false;
             Debug.Log("🎥 Start: Desktop Camera DESATIVADA (aguardando snap)");
         }
+
+        Debug.Log($"[MotherboardPlacer] Start: api={(api != null ? "OK" : "NULL")} motherboardState={(motherboardState != null ? "OK" : "NULL")}");
     }
 
     void Update()

@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class ApiSceneConfigurator : MonoBehaviour
 {
-    [Header("Referências")]
+    [Header("Referências (auto-preenchido se vazio)")]
     public Api apiController;
     public RAMModule ramModule;
     public MotherboardPlacer motherboardPlacer;
@@ -11,16 +11,27 @@ public class ApiSceneConfigurator : MonoBehaviour
 
     void Start()
     {
-        if (apiController == null) apiController = FindObjectOfType<Api>();
-        if (ramModule == null) ramModule = FindObjectOfType<RAMModule>();
-        if (motherboardPlacer == null) motherboardPlacer = FindObjectOfType<MotherboardPlacer>();
+        // Auto-find de todas as referências
+        if (apiController == null) apiController = FindFirstObjectByType<Api>();
+        if (ramModule == null) ramModule = FindFirstObjectByType<RAMModule>();
+        if (motherboardPlacer == null) motherboardPlacer = FindFirstObjectByType<MotherboardPlacer>();
 
-        previousScene = apiController.currentScene;
-        ApplySceneConfiguration();
+        Debug.Log($"[ApiSceneConfigurator] Start: api={(apiController != null ? "OK" : "NULL")} " +
+                  $"ram={(ramModule != null ? "OK" : "NULL")} " +
+                  $"mb={(motherboardPlacer != null ? "OK" : "NULL")} " +
+                  $"scene={apiController?.currentScene}");
+
+        if (apiController != null)
+        {
+            previousScene = apiController.currentScene;
+            ApplySceneConfiguration();
+        }
     }
 
     void Update()
     {
+        if (apiController == null) return;
+
         if (apiController.currentScene != previousScene)
         {
             previousScene = apiController.currentScene;

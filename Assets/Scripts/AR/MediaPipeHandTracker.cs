@@ -110,6 +110,10 @@ namespace SavitGame.AR {
         }
 
         private void OnEnable() {
+            // Auto-find ARCameraManager se não atribuído (ex: criado via AddComponent em runtime)
+            if (arCameraManager == null)
+                arCameraManager = FindFirstObjectByType<ARCameraManager>();
+
             if (!_started) {
                 StartCoroutine(StartMediaPipe());
             } else if (arCameraManager != null) {
