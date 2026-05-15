@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections;
 using System.Collections.Generic;
 using Mediapipe;
@@ -83,9 +84,15 @@ namespace SavitGame.AR {
         private IResourceManager _resourceManager;
         private HandLandmarker _handLandmarker;
 
+        private string _resolvedModelPath;
+        private HandLandmarkerResult _reusableResult;
+
         private double _nextInferenceTime;
         private bool _started;
         private bool _isRunning;
+
+        private double _nextNoCpuImageLogTime;
+        private double _nextNoHandLogTime;
 
         private NativeArray<byte> _rgbaBuffer;
         private int _rgbaWidth;
@@ -148,12 +155,23 @@ namespace SavitGame.AR {
                 yield break;
             }
             yield return prepare;
-            Debug.Log("[HandTracker] ✅ Modelo carregado.");
+            _resolvedModelPath = ResolvePreparedModelPath(modelFileName);
+            Debug.Log($"[HandTracker] ✅ Modelo preparado. model='{modelFileName}' resolvedPath='{_resolvedModelPath}'");
 
             // GPU (compartilha com segmenter se já inicializado)
             if (delegateType == BaseOptions.Delegate.GPU) {
                 if (!GpuManager.IsInitialized) {
-                    yield return GpuManager.Initialize();
+                    IEnumerator init = null;
+                    try {
+                        init = GpuManager.Initialize();
+                    } catch (Exception e) {
+                        Debug.LogWarning($"[HandTracker] ⚠️ GpuManager.Initialize lançou exceção — usando CPU. {e.Message}");
+                        delegateType = BaseOptions.Delegate.CPU;
+                    }
+
+                    if (init != null) {
+                        yield return init;
+                    }
                 }
                 if (!GpuManager.IsInitialized) {
                     Debug.LogWarning("[HandTracker] ⚠️ GPU indisponível — usando CPU.");
@@ -175,6 +193,9 @@ namespace SavitGame.AR {
                 }
             }
 
+            // Pré-alocar resultado (evita GC churn em dispositivos)
+            _reusableResult = HandLandmarkerResult.Alloc(maxNumHands);
+
             arCameraManager.frameReceived += OnCameraFrameReceived;
             _isRunning = true;
             _nextInferenceTime = 0;
@@ -184,7 +205,8 @@ namespace SavitGame.AR {
 
         private bool TryCreateHandLandmarker(BaseOptions.Delegate del) {
             try {
-                var baseOpts = new BaseOptions(del, modelAssetPath: modelFileName);
+                var modelPath = string.IsNullOrWhiteSpace(_resolvedModelPath) ? modelFileName : _resolvedModelPath;
+                var baseOpts = new BaseOptions(del, modelAssetPath: modelPath);
                 var options = new HandLandmarkerOptions(
                     baseOpts,
                     runningMode: RunningMode.VIDEO,
@@ -213,7 +235,14 @@ namespace SavitGame.AR {
             if (now < _nextInferenceTime) return;
             _nextInferenceTime = now + (1.0 / Mathf.Max(1f, inferenceHz));
 
-            if (!arCameraManager.TryAcquireLatestCpuImage(out var cpuImage)) return;
+            if (!arCameraManager.TryAcquireLatestCpuImage(out var cpuImage)) {
+                if (debugLogs && now >= _nextNoCpuImageLogTime) {
+                    _nextNoCpuImageLogTime = now + 2.0;
+                    Debug.LogWarning("[HandTracker] ⚠️ TryAcquireLatestCpuImage=false (ARCameraManager sem CPU image ainda)." +
+                                     " Verifique permissão de câmera e se o ARSession já iniciou.");
+                }
+                return;
+            }
 
             try {
                 var (outW, outH) = ComputeOutputDimensions(cpuImage.width, cpuImage.height);
@@ -230,9 +259,8 @@ namespace SavitGame.AR {
 
                 using var mpImage = new Image(TextureFormat.RGBA32.ToImageFormat(), outW, outH, outW * 4, _rgbaBuffer);
 
-                var result = HandLandmarkerResult.Alloc(maxNumHands);
-                if (_handLandmarker.TryDetectForVideo(mpImage, GetTimestampMillis(), null, ref result)) {
-                    ProcessResult(result);
+                if (_handLandmarker.TryDetectForVideo(mpImage, GetTimestampMillis(), null, ref _reusableResult)) {
+                    ProcessResult(_reusableResult);
                 } else {
                     IsHandDetected = false;
                 }
@@ -249,6 +277,13 @@ namespace SavitGame.AR {
         private void ProcessResult(HandLandmarkerResult result) {
             if (result.handLandmarks == null || result.handLandmarks.Count == 0) {
                 IsHandDetected = false;
+                if (debugLogs) {
+                    var now = Time.unscaledTimeAsDouble;
+                    if (now >= _nextNoHandLogTime) {
+                        _nextNoHandLogTime = now + 1.0;
+                        Debug.Log("[HandTracker] … nenhuma mão detectada");
+                    }
+                }
                 return;
             }
 
@@ -283,14 +318,27 @@ namespace SavitGame.AR {
             else if (HandPositionX > 0.66f) CurrentSide = "right";
             else CurrentSide = "center";
 
-            // Contagem de dedos estendidos
+            // Contagem de dedos estendidos (invariante à rotação: usa distâncias ao punho)
+            float Dist2(int a, int b) {
+                var dx = landmarks[a].x - landmarks[b].x;
+                var dy = landmarks[a].y - landmarks[b].y;
+                return dx * dx + dy * dy;
+            }
+
+            bool IsExtendedByWrist(int tip, int pip, float ratio) {
+                // Se a ponta (tip) está significativamente mais longe do punho que a articulação (pip), consideramos "estendido".
+                var dTip = Dist2(0, tip);
+                var dPip = Dist2(0, pip);
+                return dTip > (dPip * ratio);
+            }
+
             int extended = 0;
-            if (landmarks[8].y < landmarks[6].y) extended++;   // indicador
-            if (landmarks[12].y < landmarks[10].y) extended++; // médio
-            if (landmarks[16].y < landmarks[14].y) extended++; // anelar
-            if (landmarks[20].y < landmarks[18].y) extended++; // mindinho
-            // polegar: distância lateral
-            if (Mathf.Abs(landmarks[4].x - landmarks[2].x) > 0.04f) extended++;
+            if (IsExtendedByWrist(8, 6, 1.10f)) extended++;   // indicador
+            if (IsExtendedByWrist(12, 10, 1.10f)) extended++; // médio
+            if (IsExtendedByWrist(16, 14, 1.10f)) extended++; // anelar
+            if (IsExtendedByWrist(20, 18, 1.10f)) extended++; // mindinho
+            // polegar (um pouco mais permissivo)
+            if (IsExtendedByWrist(4, 2, 1.08f)) extended++;
 
             ExtendedFingers = extended;
             IsHolding = extended < minFingersForFree;
@@ -298,6 +346,27 @@ namespace SavitGame.AR {
             if (debugLogs) {
                 Debug.Log($"[HandTracker] ✋ pos=({HandPositionX:F2},{HandPositionY:F2}) dedos={ExtendedFingers} holding={IsHolding}");
             }
+        }
+
+        private static string ResolvePreparedModelPath(string fileName) {
+            // No Android, StreamingAssets fica dentro do APK (jar) e o MediaPipe Tasks precisa de caminho real no filesystem.
+            // StreamingAssetsResourceManager costuma extrair para persistentDataPath.
+            try {
+                var persistent = Path.Combine(Application.persistentDataPath, fileName);
+                if (File.Exists(persistent)) return persistent;
+            } catch {
+                // ignore
+            }
+
+            try {
+                var streaming = Path.Combine(Application.streamingAssetsPath, fileName);
+                if (File.Exists(streaming)) return streaming;
+            } catch {
+                // ignore
+            }
+
+            // Fallback: deixa como veio (pode funcionar no Editor)
+            return fileName;
         }
 
         // ──── Helpers ────────────────────────────────────────────────────────

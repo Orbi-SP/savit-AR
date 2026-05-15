@@ -30,32 +30,26 @@ public class Api : MonoBehaviour
     public GameObject currentHeld;
     bool prevHolding = false;
 
+    private double nextTrackerRetryTime;
+    private bool startedHttpFallback;
+
     // Estado interno
     private Vector3 originalPos;
     private Quaternion originalRot;
     private float accumulatedZ;
     private bool driveTransform;
 
-    public bool IsOnDevice => handTracker != null && handTracker.enabled && handTracker.gameObject.activeInHierarchy;
+    public bool IsOnDevice => handTracker != null
+        && handTracker.enabled
+        && handTracker.gameObject.activeInHierarchy
+        && handTracker.IsReady;
 
     void Start()
     {
-        // ──── Auto-setup: encontra ou CRIA o HandTracker ────
-        if (handTracker == null)
-            handTracker = FindFirstObjectByType<SavitGame.AR.MediaPipeHandTracker>();
+        // ──── Auto-setup: tenta encontrar/criar HandTracker (pode falhar se ARCameraManager ainda não existe) ────
+        TrySetupHandTracker(forceLog: true);
 
-        if (handTracker == null)
-        {
-            var arCam = FindFirstObjectByType<ARCameraManager>();
-            if (arCam != null)
-            {
-                handTracker = arCam.gameObject.AddComponent<SavitGame.AR.MediaPipeHandTracker>();
-                handTracker.arCameraManager = arCam;
-                Debug.Log($"[Api] ✅ HandTracker CRIADO em '{arCam.gameObject.name}'");
-            }
-        }
-
-        Debug.Log($"[Api] Start: tracker={(handTracker != null ? "OK" : "NULL")} scene={currentScene}");
+        Debug.Log($"[Api] Start: tracker={(handTracker != null ? "OK" : "NULL")} ready={(handTracker != null && handTracker.IsReady)} scene={currentScene}");
 
         driveTransform = (currentScene == SceneType.RAM);
         if (driveTransform && objectToMove != null)
@@ -67,8 +61,7 @@ public class Api : MonoBehaviour
 
         if (!IsOnDevice)
         {
-            Debug.Log("[Api] Sem HandTracker — fallback HTTP");
-            StartCoroutine(SendToApiRoutine());
+            StartHttpFallbackIfNeeded();
         }
         else
         {
@@ -78,6 +71,23 @@ public class Api : MonoBehaviour
 
     void Update()
     {
+        // Se o ARCameraManager / HandTracker aparecem depois (ordem de init), tenta anexar periodicamente.
+        if (!IsOnDevice)
+        {
+            var now = Time.unscaledTimeAsDouble;
+            if (now >= nextTrackerRetryTime)
+            {
+                nextTrackerRetryTime = now + 1.0;
+                TrySetupHandTracker(forceLog: false);
+
+                // Se ainda não entrou on-device, garante fallback.
+                if (!IsOnDevice)
+                {
+                    StartHttpFallbackIfNeeded();
+                }
+            }
+        }
+
         // Ler dados do tracker on-device
         if (IsOnDevice)
         {
@@ -115,6 +125,54 @@ public class Api : MonoBehaviour
             objectToMove.transform.rotation,
             isHolding ? Quaternion.Euler(-90f, originalRot.eulerAngles.y, originalRot.eulerAngles.z) : originalRot,
             Time.deltaTime * 5f);
+    }
+
+    private void StartHttpFallbackIfNeeded()
+    {
+        if (startedHttpFallback) return;
+        startedHttpFallback = true;
+
+        // Observação: 127.0.0.1 no Android aponta para o próprio celular; isso quase sempre significa "fallback não vai funcionar".
+        if (apiURL != null && apiURL.Contains("127.0.0.1"))
+        {
+            Debug.LogWarning("[Api] Fallback HTTP está apontando para 127.0.0.1 (o próprio celular). " +
+                             "Se a intenção é on-device, garanta que o HandTracker inicialize.");
+        }
+
+        Debug.Log("[Api] Sem HandTracker pronto — iniciando fallback HTTP");
+        StartCoroutine(SendToApiRoutine());
+    }
+
+    private void TrySetupHandTracker(bool forceLog)
+    {
+        if (handTracker == null)
+            handTracker = FindFirstObjectByType<SavitGame.AR.MediaPipeHandTracker>();
+
+        if (handTracker == null)
+        {
+            var arCam = FindFirstObjectByType<ARCameraManager>();
+            if (arCam != null)
+            {
+                handTracker = arCam.GetComponent<SavitGame.AR.MediaPipeHandTracker>();
+                if (handTracker == null)
+                {
+                    handTracker = arCam.gameObject.AddComponent<SavitGame.AR.MediaPipeHandTracker>();
+                }
+                handTracker.arCameraManager = arCam;
+
+                if (forceLog)
+                    Debug.Log($"[Api] HandTracker anexado/criado em '{arCam.gameObject.name}'. ready={handTracker.IsReady}");
+            }
+            else if (forceLog)
+            {
+                Debug.LogWarning("[Api] ARCameraManager ainda não existe na cena (ainda não dá pra criar HandTracker)." );
+            }
+        }
+        else
+        {
+            if (forceLog)
+                Debug.Log($"[Api] HandTracker encontrado. ready={handTracker.IsReady}");
+        }
     }
 
     // ──── Fallback HTTP ────────────────────────────────────────────────────
