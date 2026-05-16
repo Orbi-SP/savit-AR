@@ -88,5 +88,5 @@ MonoBehaviour:
     onlyWhenPlaying: 1
     debugPassLogging: 1
     debugLogIntervalSeconds: 1
-    debugDrawMaskOverlay: 1
+    debugDrawMaskOverlay: 0
     debugOverlayPassEvent: 1000
