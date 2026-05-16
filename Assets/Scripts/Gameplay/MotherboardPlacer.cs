@@ -32,6 +32,9 @@ public class MotherboardPlacer : MonoBehaviour
     private bool prevHolding;
     private bool isSnapped;
 
+    private float grabHandX;
+    private float grabAccum;
+
     private void ResolveRefsIfNeeded()
     {
         var root = transform.root;
@@ -96,14 +99,21 @@ public class MotherboardPlacer : MonoBehaviour
         // Antes da RAM estar instalada, a placa-mãe não deve sequer “levantar/mover”.
         bool requirementsOk = motherboardState == null || motherboardState.HasRequiredMemory;
 
-        bool holding = api.IsHolding;
-        if (!requirementsOk) holding = false;
+        bool holding = api.IsHolding && requirementsOk;
 
-        // Posição contínua: mapeia HandPositionX (0-1) para os limites de movimento
+        // Ao começar a segurar, captura o offset para evitar “teleporte” da placa.
+        if (holding && !prevHolding)
+        {
+            grabHandX = api.HandPositionX;
+            grabAccum = accum;
+        }
+
+        // Movimento RELATIVO (sem pulo): a placa acompanha a variação da mão a partir do ponto de pega.
         if (holding)
         {
-            float targetAccum = Mathf.Lerp(moveLimits.y, moveLimits.x, api.HandPositionX);
-            accum = Mathf.Lerp(accum, targetAccum, Time.deltaTime * 8f);
+            float movementRange = (moveLimits.y - moveLimits.x);
+            float targetAccum = grabAccum + (api.HandPositionX - grabHandX) * movementRange;
+            accum = Mathf.Lerp(accum, targetAccum, Time.deltaTime * 10f);
         }
         else
         {

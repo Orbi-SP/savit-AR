@@ -21,6 +21,9 @@ public class RAMModule : MonoBehaviour, IReleasable
     private float accum;
     private bool prevHolding;
     private bool isSnapped;
+
+    private float grabHandX;
+    private float grabAccum;
     [Header("Snap")]
     public float maxSnapDistance = 0.2f; // ajuste conforme necessário
 
@@ -62,12 +65,20 @@ public class RAMModule : MonoBehaviour, IReleasable
 
         bool holding = api.IsHolding;
 
+        // Ao começar a segurar, captura o offset para evitar “teleporte”.
+        if (holding && !prevHolding)
+        {
+            grabHandX = api.HandPositionX;
+            grabAccum = accum;
+        }
+
         if (holding)
         {
-            // Posição contínua: mapeia HandPositionX (0-1) para os limites de movimento
-            // 0 = limite esquerdo (moveLimits.x), 1 = limite direito (moveLimits.y)
-            float targetAccum = Mathf.Lerp(moveLimits.y, moveLimits.x, api.HandPositionX);
-            accum = Mathf.Lerp(accum, targetAccum, Time.deltaTime * 8f);
+            // Movimento RELATIVO: a peça acompanha a variação da mão a partir do ponto de pega.
+            // Isso evita inversão de direção e evita pulo inicial.
+            float movementRange = (moveLimits.y - moveLimits.x);
+            float targetAccum = grabAccum + (api.HandPositionX - grabHandX) * movementRange;
+            accum = Mathf.Lerp(accum, targetAccum, Time.deltaTime * 10f);
         }
         else
         {
