@@ -32,6 +32,17 @@ public class MotherboardPlacer : MonoBehaviour
     private bool prevHolding;
     private bool isSnapped;
 
+    private void ResolveRefsIfNeeded()
+    {
+        var root = transform.root;
+
+        if (api == null && root != null) api = root.GetComponentInChildren<Api>(true);
+        if (api == null) api = FindFirstObjectByType<Api>();
+
+        if (motherboardState == null && root != null) motherboardState = root.GetComponentInChildren<MotherboardState>(true);
+        if (motherboardState == null) motherboardState = FindFirstObjectByType<MotherboardState>();
+    }
+
     void Start()
     {
         originalPos = transform.position;
@@ -41,10 +52,7 @@ public class MotherboardPlacer : MonoBehaviour
         accum = 0f;
 
         // Auto-find referências se não atribuídas no Inspector
-        if (api == null)
-            api = FindFirstObjectByType<Api>();
-        if (motherboardState == null)
-            motherboardState = FindFirstObjectByType<MotherboardState>();
+        ResolveRefsIfNeeded();
 
         // Movimentação é por script; física dinâmica aqui tende a dar instabilidade.
         var rb = GetComponent<Rigidbody>();
@@ -72,11 +80,24 @@ public class MotherboardPlacer : MonoBehaviour
         Debug.Log($"[MotherboardPlacer] Start: api={(api != null ? "OK" : "NULL")} motherboardState={(motherboardState != null ? "OK" : "NULL")}");
     }
 
+    private void OnEnable()
+    {
+        Debug.Log("[MotherboardPlacer] OnEnable");
+        ResolveRefsIfNeeded();
+    }
+
     void Update()
     {
-        if (isSnapped || api == null) return;
+        if (isSnapped) return;
+        ResolveRefsIfNeeded();
+        if (api == null) return;
+        if (api.currentScene != Api.SceneType.Gabinete) return;
+
+        // Antes da RAM estar instalada, a placa-mãe não deve sequer “levantar/mover”.
+        bool requirementsOk = motherboardState == null || motherboardState.HasRequiredMemory;
 
         bool holding = api.IsHolding;
+        if (!requirementsOk) holding = false;
 
         // Posição contínua: mapeia HandPositionX (0-1) para os limites de movimento
         if (holding)

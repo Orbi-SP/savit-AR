@@ -23,6 +23,7 @@ public class MotherboardState : MonoBehaviour
         if (!installed.Contains(ram))
         {
             installed.Add(ram);
+            Debug.Log($"[MotherboardState] ✅ RegisterRam '{ram.name}'. installed={installed.Count}/{requiredRamCount}");
             if (HasRequiredMemory) onRequirementsMet?.Invoke();
         }
     }
@@ -32,6 +33,7 @@ public class MotherboardState : MonoBehaviour
         if (ram == null) return;
         if (installed.Remove(ram))
         {
+            Debug.Log($"[MotherboardState] ❌ UnregisterRam '{ram.name}'. installed={installed.Count}/{requiredRamCount}");
             if (!HasRequiredMemory) onRequirementsUnmet?.Invoke();
         }
     }

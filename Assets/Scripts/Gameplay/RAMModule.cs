@@ -31,8 +31,12 @@ public class RAMModule : MonoBehaviour, IReleasable
         accum = 0f;
 
         // Auto-find Api se não atribuído no Inspector
-        if (api == null)
-            api = FindFirstObjectByType<Api>();
+            if (api == null)
+            {
+                var root = transform.root;
+                if (root != null) api = root.GetComponentInChildren<Api>(true);
+                if (api == null) api = FindFirstObjectByType<Api>();
+            }
 
         // Esses objetos são movidos por script; física dinâmica aqui costuma causar jitter/"voar".
         var rb = GetComponent<Rigidbody>();
@@ -53,6 +57,7 @@ public class RAMModule : MonoBehaviour, IReleasable
     void Update()
     {
         if (api == null) return;
+        if (api.currentScene != Api.SceneType.RAM) return;
         if (isSnapped) return;
 
         bool holding = api.IsHolding;
@@ -104,65 +109,90 @@ public class RAMModule : MonoBehaviour, IReleasable
 
     public void OnRelease()
     {
+        if (api != null && api.currentScene != Api.SceneType.RAM) return;
         TrySnapToNearestSlot();
     }
 
     void TrySnapToNearestSlot()
-{
-    if (isSnapped) return;
-    if (slots == null || slots.Length == 0) return;
-
-    RAMSlot best = null;
-    float bestDist = float.MaxValue;
-
-    foreach (var slot in slots)
     {
-        if (slot == null || slot.snapAnchor == null) continue;
+        if (isSnapped) return;
+        if (slots == null || slots.Length == 0) return;
 
-        float dist = Vector3.Distance(transform.position, slot.snapAnchor.position);
+        RAMSlot best = null;
+        float bestDist = float.MaxValue;
 
-        if (dist < bestDist)
+        // Regra de snap: precisa estar ALINHADO (em cima do slot) e perto do anchor.
+        foreach (var slot in slots)
         {
-            best = slot;
-            bestDist = dist;
-        }
-    }
+            if (slot == null || slot.snapAnchor == null) continue;
 
-    // ⛔️ Só faz o snap se estiver suficientemente perto
-    if (best != null && bestDist <= maxSnapDistance)
-    {
-        transform.SetParent(best.snapAnchor, worldPositionStays: false);
-        transform.localPosition = Vector3.zero;
-        transform.localRotation = Quaternion.Euler(270f, 0f, 0f);
-        Debug.Log("📌 RAM Parent = " + transform.parent?.name);
+            // Alinhamento X/Z no espaço do slot (evita encaixar “no ar” só por distância).
+            if (!slot.IsAlignedXZ(transform.position)) continue;
 
-        isSnapped = true;
-
-        if (best.motherboard != null)
-            best.motherboard.RegisterRam(this);
-
-        if (lockWhenSnapped)
-        {
-            var rb = GetComponent<Rigidbody>();
-            if (rb) { rb.isKinematic = true; rb.useGravity = false; }
-            var col = GetComponent<Collider>();
-            if (col) col.enabled = false;
+            float dist = Vector3.Distance(transform.position, slot.snapAnchor.position);
+            if (dist < bestDist)
+            {
+                best = slot;
+                bestDist = dist;
+            }
         }
 
-        Debug.Log("✅ RAM encaixada no Anchor (como filho direto do snapAnchor).");
-
-        // 🔄 Trocar para cena do gabinete após RAM encaixada
-        if (api != null)
+        // ⛔️ Só faz o snap se estiver suficientemente perto
+        if (best != null && bestDist <= maxSnapDistance)
         {
-            api.currentScene = Api.SceneType.Gabinete;
-            Debug.Log("🔄 Cena trocada para Gabinete automaticamente.");
-        }
+            transform.SetParent(best.snapAnchor, worldPositionStays: false);
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.Euler(270f, 0f, 0f);
+            Debug.Log("📌 RAM Parent = " + transform.parent?.name);
 
+            isSnapped = true;
+
+                // Registrar RAM no MotherboardState (não depender apenas da referência do slot)
+                MotherboardState state = best.motherboard;
+                if (state == null)
+                {
+                    var root = transform.root;
+                    if (root != null) state = root.GetComponentInChildren<MotherboardState>(true);
+                }
+                if (state == null)
+                {
+                    state = FindFirstObjectByType<MotherboardState>();
+                }
+
+                if (state != null)
+                {
+                    Debug.Log($"[RAMModule] RegisterRam -> state='{state.name}' (slot='{best.name}')");
+                    state.RegisterRam(this);
+                }
+                else
+                {
+                    Debug.LogWarning($"[RAMModule] ❌ Não achei MotherboardState para registrar RAM (slot='{best.name}').");
+                }
+
+            if (lockWhenSnapped)
+            {
+                var rb = GetComponent<Rigidbody>();
+                if (rb) { rb.isKinematic = true; rb.useGravity = false; }
+                var col = GetComponent<Collider>();
+                if (col) col.enabled = false;
+            }
+
+            Debug.Log("✅ RAM encaixada no Anchor (como filho direto do snapAnchor)." );
+
+            // 🔄 Trocar para cena do gabinete após RAM encaixada
+            if (api != null)
+            {
+                var prev = api.currentScene;
+                api.currentScene = Api.SceneType.Gabinete;
+                Debug.Log($"[RAMModule] 🔄 currentScene {prev} → {api.currentScene}");
+                Debug.Log("🔄 Cena trocada para Gabinete automaticamente.");
+            }
+
+        }
+        else
+        {
+            Debug.Log("❌ RAM fora do slot / distante para snap.");
+        }
     }
-    else
-    {
-        Debug.Log("❌ RAM muito distante para snap.");
-    }
-}
 
 }
