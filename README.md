@@ -16,8 +16,6 @@ Assista a uma demonstração prática do projeto em funcionamento no vídeo abai
 Como o Software atualmente está em desenvolvimento e não há uma versão de build que funcione corretamente, você precisará ter acesso aos itens abaixo:
 
 - **Unity Engine (Unity Hub)**: Você precisará ter instalado em sua máquina o Unity Engine para executar o jogo, pois como não há uma build funcional para o jogo de fato, você tem que executá-lo no modo de desenvolvimento.
-- **Unity Engine (Unity Hub)**: Você precisará ter instalado em sua máquina o Unity Engine para executar o jogo, pois como não há uma build funcional para o jogo de fato, você tem que executá-lo no modo de desenvolvimento.
-- **Unity Engine (Unity Hub)**: Você precisará ter instalado em sua máquina o Unity Engine para executar o jogo, pois como não há uma build funcional para o jogo de fato, você tem que executá-lo no modo de desenvolvimento.
 - **Internet**: o Unity vai baixar dependências via UPM (Unity Package Manager) na primeira abertura.
 - **Git**: necessário para o UPM baixar o pacote do MediaPipe (dependência via Git).
 

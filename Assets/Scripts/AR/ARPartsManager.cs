@@ -38,7 +38,9 @@ namespace SavitGame.AR {
             if (gabinete == null) gabinete = FindChildByNameContains("PCCaseMM", "Gabinete", "Case");
             if (ram == null) ram = FindChildByNameContains("Ram", "RAM");
             if (motherboard == null) motherboard = FindChildByNameContains("Motherboards", "Motherboard", "PlacaMae");
-            if (monitor == null) monitor = FindChildByNameContains("MonitorD10", "Monitor");
+            // Evita falsos-positivos (ex.: outros filhos com "Monitor" no nome).
+            // Se você remover o MonitorD10 do prefab, monitor deve permanecer null (comportamento ok).
+            if (monitor == null) monitor = FindChildByNameContains("MonitorD10");
         }
 
         private GameObject FindChildByNameContains(params string[] nameCandidates) {
