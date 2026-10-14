@@ -1115,7 +1115,9 @@ namespace SavitGame.AR {
 
                 // Importante (Android): evitar um pico de memória instanciando um segundo prefab pesado.
                 // Quando possível, reaproveita o ghost como instância final.
-                bool canReuseGhost = reuseGhostAsPlacedScene && ghostInstance != null;
+                bool canReuseGhost = reuseGhostAsPlacedScene &&
+                    ghostInstance != null &&
+                    HasGameplayDependencies(ghostInstance);
                 if (canReuseGhost) {
                     spawnedScene = ghostInstance;
                     ghostInstance = null;
@@ -1243,6 +1245,15 @@ namespace SavitGame.AR {
 
                 b.enabled = true;
             }
+        }
+
+        private bool HasGameplayDependencies(GameObject root) {
+            if (root == null) return false;
+
+            return root.GetComponentInChildren<Api>(true) != null &&
+                   root.GetComponentInChildren<RAMModule>(true) != null &&
+                   root.GetComponentInChildren<MotherboardPlacer>(true) != null &&
+                   root.GetComponentInChildren<ApiSceneConfigurator>(true) != null;
         }
 
         private void MakeAllRigidbodiesKinematic(GameObject root) {

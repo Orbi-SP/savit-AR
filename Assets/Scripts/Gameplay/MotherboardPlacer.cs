@@ -32,6 +32,8 @@ public class MotherboardPlacer : MonoBehaviour
     private bool prevHolding;
     private bool isSnapped;
 
+    public bool IsSnapped => isSnapped;
+
     private float grabHandX;
     private float grabAccum;
 
