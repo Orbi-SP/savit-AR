@@ -858,8 +858,8 @@ MonoBehaviour:
   snapAnchor: {fileID: 73872025}
   motherboardPlacer: {fileID: 691339220}
   useAxisX: 1
-  moveSpeed: 3
-  liftY: 4
+  moveSpeed: 0.5
+  liftY: 10
   moveLimits: {x: -10, y: 10}
   snapTolerance: 0.05
 --- !u!1 &410087039
@@ -2056,8 +2056,20 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5941164928815795120, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.034899585
+      objectReference: {fileID: 0}
+    - target: {fileID: 5941164928815795120, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5941164928815795120, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 1
+      value: 0.99939084
+      objectReference: {fileID: 0}
+    - target: {fileID: 5941164928815795120, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -4
       objectReference: {fileID: 0}
     - target: {fileID: 5941164928815795120, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -2074,6 +2086,10 @@ PrefabInstance:
     - target: {fileID: 6596369915363404819, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
       propertyPath: m_Size.y
       value: 0.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 7715403000244427094, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
+      propertyPath: moveSpeed
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8025708658822368704, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
       propertyPath: m_LocalPosition.y
@@ -2121,6 +2137,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 8990157606056044722, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
+    - {fileID: 7715403000244427094, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
     m_RemovedGameObjects:
     - {fileID: 5020744834808695449, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
     - {fileID: 8951655105160193706, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
@@ -5191,7 +5208,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 860321811777208607, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2905190559316179495, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
       propertyPath: m_LocalPosition.x
@@ -5253,6 +5270,10 @@ PrefabInstance:
       propertyPath: m_Size.y
       value: 0.03
       objectReference: {fileID: 0}
+    - target: {fileID: 7715403000244427094, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
+      propertyPath: api
+      value: 
+      objectReference: {fileID: 1670055846}
     - target: {fileID: 8025708658822368704, guid: 439fda87c71ba4a41b1f5f5286da835d, type: 3}
       propertyPath: m_LocalPosition.y
       value: -0.372

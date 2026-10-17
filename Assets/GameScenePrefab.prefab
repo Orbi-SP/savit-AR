@@ -13142,13 +13142,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e9727b89c7d4c842a1e59f0ed1d417f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PowerSupplyPlacer
-  api: {fileID: 0}
-  snapZone: {fileID: 0}
-  snapAnchor: {fileID: 0}
-  motherboardPlacer: {fileID: 0}
+  api: {fileID: 8145623607887436198}
+  snapZone: {fileID: 868340195037493111}
+  snapAnchor: {fileID: 5941164928815795120}
+  motherboardPlacer: {fileID: 9089975591778190767}
   useAxisX: 1
-  moveSpeed: 3
-  liftY: 4
+  moveSpeed: 1
+  liftY: 3
   moveLimits: {x: -10, y: 10}
   snapTolerance: 0.05
 --- !u!1001 &7345208538767364214
