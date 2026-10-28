@@ -1461,6 +1461,8 @@ namespace SavitGame.AR {
             foreach (var rend in renderers) {
                 if (rend == null || !rend.enabled) continue;
                 if (!rend.gameObject.activeInHierarchy) continue;
+                // Cabos (LineRenderer) não definem o centro/apoio da cena.
+                if (rend is LineRenderer) continue;
                 if (!hasBounds) {
                     combined = rend.bounds;
                     hasBounds = true;
