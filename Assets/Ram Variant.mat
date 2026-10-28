@@ -22,7 +22,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: Ram Variant
   m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
-  m_Parent: {fileID: 1836924734629127365, guid: 545551b9dce9d8f45be5bfe5ef1a85b8, type: 3}
+  m_Parent: {fileID: 2100000, guid: 95392768a4d37454383d4e1fdb6fb681, type: 2}
   m_ModifiedSerializedProperties: 16
   m_ValidKeywords: []
   m_InvalidKeywords: []

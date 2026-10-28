@@ -53,7 +53,7 @@ namespace SavitGame.AR {
             var renderers = GetComponentsInChildren<Renderer>(includeInactive: true);
             foreach (var r in renderers) {
                 if (r == null) continue;
-                if (r is MeshRenderer || r is SkinnedMeshRenderer) {
+                if (r is MeshRenderer || r is SkinnedMeshRenderer || r is LineRenderer) {
                     originalSharedMaterials[r] = r.sharedMaterials;
                 }
             }

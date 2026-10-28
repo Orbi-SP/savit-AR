@@ -26,6 +26,8 @@ public class PowerSupplyPlacer : MonoBehaviour
 	private float grabHandX;
 	private float grabAccum;
 
+	public bool IsSnapped => isSnapped;
+
 	private void ResolveRefsIfNeeded()
 	{
 		var root = transform.root;

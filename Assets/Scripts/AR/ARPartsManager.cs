@@ -27,6 +27,7 @@ namespace SavitGame.AR {
         private void Awake() {
             AutoAssignMissingParts();
             ConfigurePowerSupplyPlacer();
+            ConfigurePowerCableConnectors();
 
             // Configura visibilidade inicial sem sobrescrever decisões posteriores.
             // Importante: ConfirmPlacement() chama ShowAllParts() imediatamente após instanciar,
@@ -117,6 +118,22 @@ namespace SavitGame.AR {
 
             if (placer.snapZone == null || placer.snapAnchor == null)
                 Debug.LogWarning("[ARPartsManager] PowerSupplySnapZone/SnapAnchor não configurados para a fonte.");
+        }
+
+        private void ConfigurePowerCableConnectors() {
+            // O LineRenderer do cabo fica no ATX24PinPSU (ponta presa na fonte).
+            foreach (var line in GetComponentsInChildren<LineRenderer>(includeInactive: true)) {
+                if (!line.name.Equals("ATX24PinPSU", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var connector = line.GetComponent<PowerCableConnector>();
+                if (connector == null) connector = line.gameObject.AddComponent<PowerCableConnector>();
+
+                if (connector.api == null) connector.api = GetComponentInParent<Api>();
+                if (connector.api == null) connector.api = GetComponentInChildren<Api>(true);
+                if (connector.powerSupplyPlacer == null && powerSupply != null)
+                    connector.powerSupplyPlacer = powerSupply.GetComponent<PowerSupplyPlacer>();
+            }
         }
 
         public void ShowAllParts() {
