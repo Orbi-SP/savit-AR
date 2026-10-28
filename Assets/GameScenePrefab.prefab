@@ -12921,11 +12921,11 @@ PrefabInstance:
     - target: {fileID: -7511558181221131132, guid: 545551b9dce9d8f45be5bfe5ef1a85b8, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 48f959601336f9d419cd8ebb4731ed7c, type: 2}
+      objectReference: {fileID: 2100000, guid: 95392768a4d37454383d4e1fdb6fb681, type: 2}
     - target: {fileID: -7511558181221131132, guid: 545551b9dce9d8f45be5bfe5ef1a85b8, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
-      objectReference: {fileID: 2100000, guid: caf069904b8e0e34280d42e883106b89, type: 2}
+      objectReference: {fileID: 2100000, guid: d4983e1d26f7cbe4494a413a8bf00040, type: 2}
     - target: {fileID: 919132149155446097, guid: 545551b9dce9d8f45be5bfe5ef1a85b8, type: 3}
       propertyPath: m_Name
       value: Ram

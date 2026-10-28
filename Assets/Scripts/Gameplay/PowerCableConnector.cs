@@ -32,6 +32,11 @@ public class PowerCableConnector : MonoBehaviour
 	public Vector3 cableEndLocal = new Vector3(0.000636701f, -0.0000155930f, 0.000234116f);
 	[Tooltip("Ponto que define a direção em que o cabo entra no ATX24PinMB.")]
 	public Vector3 cableEndDirLocal = new Vector3(0.000360737f, -0.0000071964f, 0.000233963f);
+	[Tooltip("Liga o cabo no topo do ATX24PinMB (pelo mesh) em vez de usar cableEndLocal.")]
+	public bool attachCableToConnectorTop = true;
+	[Range(0f, 1f)]
+	[Tooltip("Quanto a ponta do cabo entra no topo do ATX24PinMB (fração da altura do conector).")]
+	public float cableEndSink = 0.15f;
 
 	[Header("Movimento")]
 	[Tooltip("Quanto o conector avança no caminho por variação da mão (0..1 da tela).")]
@@ -343,6 +348,11 @@ public class PowerCableConnector : MonoBehaviour
 	{
 		Vector3 p0 = transform.TransformPoint(cableStartLocal);
 		Vector3 p3 = mbConnector.TransformPoint(cableEndLocal);
+		// O cableEndLocal desenhado fica acima do conector: prende a ponta no topo do mesh do ATX24PinMB.
+		if (attachCableToConnectorTop && TryGetConnectorBounds(out Bounds endBounds))
+		{
+			p3 = new Vector3(endBounds.center.x, endBounds.max.y - endBounds.size.y * cableEndSink, endBounds.center.z);
+		}
 		float len = Vector3.Distance(p0, p3) * curveTension;
 
 		Vector3 exitDir = SafeDir(transform.TransformPoint(cableStartDirLocal) - p0);
@@ -350,6 +360,7 @@ public class PowerCableConnector : MonoBehaviour
 
 		// O cabo chega no conector da placa por cima (a placa fica deitada no gabinete).
 		if (Vector3.Dot(entryDir, Vector3.up) < 0f) entryDir = -entryDir;
+		if (attachCableToConnectorTop) entryDir = Vector3.up;
 
 		bool hasPsu = TryGetPowerSupplyBounds(out Bounds psuBounds);
 		// O cabo sai do conector da fonte para fora dela, nunca para dentro.
