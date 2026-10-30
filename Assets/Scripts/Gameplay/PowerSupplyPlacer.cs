@@ -65,6 +65,8 @@ public class PowerSupplyPlacer : MonoBehaviour
 		ResolveRefsIfNeeded();
 		if (api == null || api.currentScene != Api.SceneType.Gabinete) return;
 		if (motherboardPlacer == null || !motherboardPlacer.IsSnapped) return;
+		// Explicação do tutorial aberta: não deixa pegar a peça.
+		if (TutorialGate.InputLocked) { prevHolding = false; return; }
 
 		bool holding = api.IsHolding;
 

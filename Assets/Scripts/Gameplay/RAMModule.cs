@@ -21,6 +21,7 @@ public class RAMModule : MonoBehaviour, IReleasable
     private float accum;
     private bool prevHolding;
     private bool isSnapped;
+    public bool IsSnapped => isSnapped;
 
     private float grabHandX;
     private float grabAccum;
@@ -62,6 +63,8 @@ public class RAMModule : MonoBehaviour, IReleasable
         if (api == null) return;
         if (api.currentScene != Api.SceneType.RAM) return;
         if (isSnapped) return;
+        // Explicação do tutorial aberta: não deixa pegar a peça.
+        if (TutorialGate.InputLocked) { prevHolding = false; return; }
 
         bool holding = api.IsHolding;
 
