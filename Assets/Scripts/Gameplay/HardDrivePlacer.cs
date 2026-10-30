@@ -28,7 +28,7 @@ public class HardDrivePlacer : MonoBehaviour
 	[Header("Animação - Colocar na baia")]
 	[Tooltip("De onde o HD começa a deslizar para dentro da baia (em tamanhos do HD).")]
 	public float entryOffset = 0.8f;
-	[Tooltip("Entra por cima (up do SnapAnchor): no AR o gabinete fica deitado e aberto para cima. Desligado = forward do SnapAnchor.")]
+	[Tooltip("Entra por cima (up da cena): no AR o gabinete fica deitado e aberto para cima. Desligado = forward do SnapAnchor.")]
 	public bool entryFromAbove = true;
 	public float approachDuration = 0.3f;
 	public float slideDuration = 0.6f;
@@ -48,8 +48,8 @@ public class HardDrivePlacer : MonoBehaviour
 	[Tooltip("Arco do cabo (para cima, visível de cima no AR) em relação à distância entre o HD e a placa-mãe.")]
 	public float cableSag = 0.25f;
 	public int cableSegments = 16;
-	[Tooltip("Liga o SATA na placa ao lado do conector de 24 pinos já conectado (mesmo ponto onde o cabo ATX encaixou). Desligado = usa SATAPort_Placa.")]
-	public bool sataNextToAtx24 = true;
+	[Tooltip("Liga o SATA ao lado do conector de 24 pinos em vez da SATAPort_Placa. Sem SATAPort_Placa, esse é sempre o caminho.")]
+	public bool sataNextToAtx24 = false;
 	[Tooltip("Distância da porta SATA até o conector de 24 pinos, para dentro da placa-mãe (em tamanhos do HD).")]
 	public float sataOffsetFromAtx24 = 0.25f;
 
@@ -207,7 +207,9 @@ public class HardDrivePlacer : MonoBehaviour
 	private IEnumerator InstallSequence()
 	{
 		// 1) Colocar: o HD vai até a frente da baia e desliza para dentro.
-		Vector3 entryDir = entryFromAbove ? snapAnchor.up : snapAnchor.forward;
+		// "Cima" da cena, não do anchor: com o HD de lado na gaveta, o up do anchor fica na horizontal.
+		Vector3 sceneUp = transform.parent != null ? transform.parent.up : Vector3.up;
+		Vector3 entryDir = entryFromAbove ? sceneUp : snapAnchor.forward;
 		Vector3 bayEntry = snapAnchor.position + entryDir * (hdSize * entryOffset);
 		yield return MoveTo(bayEntry, snapAnchor.rotation, approachDuration);
 		yield return MoveTo(snapAnchor.position, snapAnchor.rotation, slideDuration);
@@ -269,13 +271,14 @@ public class HardDrivePlacer : MonoBehaviour
 	}
 
 	/// <summary>
-	/// Onde o cabo SATA termina. Preferência: ao lado do conector de 24 pinos já ligado — é o ponto real da
-	/// placa-mãe onde o cabo ATX encaixou —, deslocado para dentro da placa. Sem cabo ATX, usa SATAPort_Placa.
+	/// Onde o cabo SATA termina. Preferência: SATAPort_Placa (filha da placa-mãe, nas portas SATA da borda).
+	/// Sem ela (ou com sataNextToAtx24), ao lado do conector de 24 pinos já ligado, para dentro da placa.
 	/// </summary>
 	private bool ResolveSataEnd()
 	{
 		Vector3 endWorld;
-		Transform atx = sataNextToAtx24 && powerCable != null && powerCable.IsConnected ? powerCable.mbConnector : null;
+		bool useAtx = sataNextToAtx24 || sataPortPlaca == null;
+		Transform atx = useAtx && powerCable != null && powerCable.IsConnected ? powerCable.mbConnector : null;
 		if (atx != null)
 		{
 			Vector3 inward = Vector3.zero;
