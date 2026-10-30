@@ -10314,7 +10314,7 @@ Transform:
   m_GameObject: {fileID: 6861646757408554358}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -79.7755, y: 4.3118176, z: -11.6501875}
+  m_LocalPosition: {x: -64.9275, y: 4.805, z: -12.02}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -13872,7 +13872,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: dc3386fef6147d049a9b3b3d65bbda38, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -84.568794
+      value: -73.4925
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: dc3386fef6147d049a9b3b3d65bbda38, type: 3}
       propertyPath: m_LocalPosition.y
@@ -13880,7 +13880,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: dc3386fef6147d049a9b3b3d65bbda38, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -11.6501875
+      value: -12.02
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: dc3386fef6147d049a9b3b3d65bbda38, type: 3}
       propertyPath: m_LocalRotation.w
@@ -13948,7 +13948,7 @@ MonoBehaviour:
   useAxisX: 1
   moveSpeed: 1.3333334
   liftY: 2.2045445
-  moveLimits: {x: -0.95865935, y: 6.2312856}
+  moveLimits: {x: -1.713, y: 11.1345}
   snapTolerance: 0.05
   entryOffset: 0.8
   entryFromAbove: 1
