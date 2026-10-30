@@ -24,10 +24,14 @@ namespace SavitGame.AR {
         [Tooltip("Arraste o MonitorD10 aqui")]
         public GameObject monitor;
 
+        [Tooltip("Arraste o objeto HardDrive aqui")]
+        public GameObject hardDrive;
+
         private void Awake() {
             AutoAssignMissingParts();
             ConfigurePowerSupplyPlacer();
             ConfigurePowerCableConnectors();
+            ConfigureHardDrivePlacer();
 
             // Configura visibilidade inicial sem sobrescrever decisões posteriores.
             // Importante: ConfirmPlacement() chama ShowAllParts() imediatamente após instanciar,
@@ -47,6 +51,18 @@ namespace SavitGame.AR {
             // Evita falsos-positivos (ex.: outros filhos com "Monitor" no nome).
             // Se você remover o MonitorD10 do prefab, monitor deve permanecer null (comportamento ok).
             if (monitor == null) monitor = FindChildByNameContains("MonitorD10");
+            // Nome exato: "HD" por substring pegaria HDMI, Shadow etc.
+            if (hardDrive == null) hardDrive = FindChildByExactName("HardDrive", "HD_SATA");
+        }
+
+        private GameObject FindChildByExactName(params string[] names) {
+            foreach (var t in GetComponentsInChildren<Transform>(includeInactive: true)) {
+                for (int i = 0; i < names.Length; i++) {
+                    if (t.name.Equals(names[i], System.StringComparison.OrdinalIgnoreCase))
+                        return t.gameObject;
+                }
+            }
+            return null;
         }
 
         private GameObject FindChildByNameContains(params string[] nameCandidates) {
@@ -106,15 +122,7 @@ namespace SavitGame.AR {
                 if (zoneObject != null) placer.snapZone = zoneObject.GetComponent<BoxCollider>();
             }
 
-            if (placer.snapAnchor == null && placer.snapZone != null) {
-                foreach (var anchor in placer.snapZone.GetComponentsInChildren<Transform>(true)) {
-                    if (anchor != placer.snapZone.transform &&
-                        anchor.name.Equals("SnapAnchor", System.StringComparison.OrdinalIgnoreCase)) {
-                        placer.snapAnchor = anchor;
-                        break;
-                    }
-                }
-            }
+            if (placer.snapAnchor == null) placer.snapAnchor = FindSnapAnchor(placer.snapZone);
 
             if (placer.snapZone == null || placer.snapAnchor == null)
                 Debug.LogWarning("[ARPartsManager] PowerSupplySnapZone/SnapAnchor não configurados para a fonte.");
@@ -136,12 +144,62 @@ namespace SavitGame.AR {
             }
         }
 
+        private void ConfigureHardDrivePlacer() {
+            if (hardDrive == null) {
+                Debug.LogWarning("[ARPartsManager] HD (HardDrive) não encontrado para configurar o HardDrivePlacer.");
+                return;
+            }
+
+            var placer = hardDrive.GetComponent<HardDrivePlacer>();
+            if (placer == null) placer = hardDrive.AddComponent<HardDrivePlacer>();
+
+            if (placer.api == null) placer.api = GetComponentInParent<Api>();
+            if (placer.api == null) placer.api = GetComponentInChildren<Api>(true);
+            if (placer.api == null) placer.api = FindFirstObjectByType<Api>();
+
+            if (placer.powerSupplyPlacer == null && powerSupply != null)
+                placer.powerSupplyPlacer = powerSupply.GetComponent<PowerSupplyPlacer>();
+
+            // O HD só é liberado depois do cabo ATX 24 pinos (ConfigurePowerCableConnectors roda antes).
+            if (placer.powerCable == null)
+                placer.powerCable = GetComponentInChildren<PowerCableConnector>(true);
+
+            if (placer.snapZone == null) {
+                var zoneObject = FindChildByNameContains("HardDriveSnapZone");
+                if (zoneObject != null) placer.snapZone = zoneObject.GetComponent<BoxCollider>();
+            }
+
+            if (placer.snapAnchor == null) placer.snapAnchor = FindSnapAnchor(placer.snapZone);
+
+            if (placer.sataPortPlaca == null) {
+                var port = FindChildByNameContains("SATAPort_Placa");
+                if (port != null) placer.sataPortPlaca = port.transform;
+            }
+
+            if (placer.snapZone == null || placer.snapAnchor == null)
+                Debug.LogWarning("[ARPartsManager] HardDriveSnapZone/SnapAnchor não configurados para o HD.");
+            if (placer.sataPortPlaca == null)
+                Debug.LogWarning("[ARPartsManager] SATAPort_Placa não encontrado; o cabo SATA não será desenhado.");
+        }
+
+        private Transform FindSnapAnchor(BoxCollider zone) {
+            if (zone == null) return null;
+
+            foreach (var anchor in zone.GetComponentsInChildren<Transform>(true)) {
+                if (anchor != zone.transform &&
+                    anchor.name.Equals("SnapAnchor", System.StringComparison.OrdinalIgnoreCase))
+                    return anchor;
+            }
+            return null;
+        }
+
         public void ShowAllParts() {
             SetVisible(gabinete, true);
             SetVisible(ram, true);
             SetVisible(motherboard, true);
             SetVisible(powerSupply, true);
             SetVisible(monitor, true);
+            SetVisible(hardDrive, true);
         }
 
         public void HideAllParts() {
@@ -150,6 +208,7 @@ namespace SavitGame.AR {
             SetVisible(motherboard, false);
             SetVisible(powerSupply, false);
             SetVisible(monitor, false);
+            SetVisible(hardDrive, false);
         }
 
         // ── Métodos chamados pelos botões da UI ──────────────────────────
@@ -159,12 +218,14 @@ namespace SavitGame.AR {
         public void MostrarMotherboard() => SetVisible(motherboard, true);
         public void MostrarPowerSupply() => SetVisible(powerSupply, true);
         public void MostrarMonitor()     => SetVisible(monitor, true);
+        public void MostrarHardDrive()   => SetVisible(hardDrive, true);
 
         public void OcultarGabinete()    => SetVisible(gabinete, false);
         public void OcultarRAM()         => SetVisible(ram, false);
         public void OcultarMotherboard() => SetVisible(motherboard, false);
         public void OcultarPowerSupply() => SetVisible(powerSupply, false);
         public void OcultarMonitor()     => SetVisible(monitor, false);
+        public void OcultarHardDrive()   => SetVisible(hardDrive, false);
 
         /// <summary>Alterna visibilidade de uma peça (toggle).</summary>
         public void ToggleGabinete()    => Toggle(gabinete);
@@ -172,6 +233,7 @@ namespace SavitGame.AR {
         public void ToggleMotherboard() => Toggle(motherboard);
         public void TogglePowerSupply() => Toggle(powerSupply);
         public void ToggleMonitor()     => Toggle(monitor);
+        public void ToggleHardDrive()   => Toggle(hardDrive);
 
         // ── Helpers ─────────────────────────────────────────────────────
 
