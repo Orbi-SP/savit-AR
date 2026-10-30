@@ -31,6 +31,60 @@ namespace SavitGame.Editor.HardDriveSetup {
             AssetDatabase.SaveAssets();
         }
 
+        /// <summary>
+        /// Só leitura: loga no Console (e no Editor.log) onde cada peça está no espaço da raiz do prefab,
+        /// para conferir/ajustar a posição do HD sem precisar de print. Não salva nada.
+        /// </summary>
+        [MenuItem("SAVIT/Diagnosticar posições do HD")]
+        public static void Diagnose() {
+            GameObject root = PrefabUtility.LoadPrefabContents(MainPrefabPath);
+            try {
+                Transform r = root.transform;
+                var sb = new System.Text.StringBuilder("[HardDriveDiag] posições no espaço da raiz de " + MainPrefabPath + "\n");
+
+                string[] points = { "HardDrive", "HardDriveSnapZone", "SATAPort_Placa", "PowerSupply", "PowerSupplySnapZone",
+                                    "MotherboardSnapZone", "ATX24PinMB", "ATX24PinSnapZone", "Motherboards", "PCCaseMM", "MonitorD10", "Ram" };
+                foreach (var n in points) {
+                    Transform t = FindExact(r, n) ?? FindContains(r, n);
+                    if (t == null) { sb.AppendLine($"  {n}: NÃO ENCONTRADO"); continue; }
+                    string anchor = "";
+                    if (n.EndsWith("SnapZone")) anchor = $" anchor={r.InverseTransformPoint(FindSnapAnchor(t).position)}";
+                    sb.AppendLine($"  {n}: pos={r.InverseTransformPoint(t.position)} ativo={t.gameObject.activeInHierarchy}{anchor}");
+                }
+
+                string[] parts = { "PCCaseMM", "PowerSupply", "Motherboards", "MonitorD10", "HardDrive", "Ram" };
+                foreach (var n in parts) {
+                    Transform t = FindExact(r, n) ?? FindContains(r, n);
+                    if (t == null) continue;
+                    Bounds all = LocalBounds(t, r);
+                    Bounds visible = LocalBounds(t, r, onlyVisible: true);
+                    sb.AppendLine($"  bounds {n}: todas={all.center} tam={all.size} | visíveis={visible.center} tam={visible.size}");
+                }
+
+                // Malhas do gabinete: as que estão longe do centro visível podem estar esticando os bounds.
+                Transform caseT = FindContains(r, "PCCaseMM");
+                if (caseT != null) {
+                    Bounds visible = LocalBounds(caseT, r, onlyVisible: true);
+                    sb.AppendLine("  malhas do gabinete mais distantes do centro visível:");
+                    var list = new System.Collections.Generic.List<(float d, string line)>();
+                    foreach (var mf in caseT.GetComponentsInChildren<MeshFilter>(true)) {
+                        if (mf.sharedMesh == null) continue;
+                        Bounds b = MeshBounds(mf, r);
+                        var rend = mf.GetComponent<Renderer>();
+                        list.Add((Vector3.Distance(b.center, visible.center),
+                            $"    {mf.name}: centro={b.center} tam={b.size} ativo={mf.gameObject.activeInHierarchy} renderer={(rend != null && rend.enabled)}"));
+                    }
+                    list.Sort((a, b) => b.d.CompareTo(a.d));
+                    for (int i = 0; i < Mathf.Min(8, list.Count); i++) sb.AppendLine(list[i].line);
+                }
+
+                Debug.Log(sb.ToString());
+            }
+            finally {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
         private static void Setup(string prefabPath, GameObject model, bool addPlacer) {
             GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
             try {
@@ -44,9 +98,9 @@ namespace SavitGame.Editor.HardDriveSetup {
                 Transform caseT = FindContains(r, "PCCaseMM");
                 Transform psu = FindExact(r, "PowerSupply");
                 Transform psuZone = FindContains(r, "PowerSupplySnapZone");
-                Transform motherboard = FindContains(r, "Motherboards");
+                // Exato primeiro: "Motherboards" por substring (sem caixa) casa com "MotherboardSnapZone".
+                Transform motherboard = FindExact(r, "Motherboards") ?? FindContains(r, "Motherboards");
                 Transform atxMb = FindContains(r, "ATX24PinMB");
-                Transform monitor = FindContains(r, "MonitorD10");
 
                 if (caseT == null || psu == null || motherboard == null) {
                     Debug.LogError($"[HardDrivePrefabSetup] {prefabPath}: gabinete, fonte ou placa-mãe não encontrados.");
@@ -68,24 +122,17 @@ namespace SavitGame.Editor.HardDriveSetup {
                 hd.transform.localScale = Vector3.one * scale;
                 hdB = LocalBounds(hd.transform, r);
 
-                // 2) Baia: no chão do gabinete, do lado oposto ao da fonte no eixo horizontal mais longo
-                //    (fonte atrás, gaiola de HD na frente).
+                // 2) Baia: dentro do gabinete, ao lado da fonte instalada (lado das gavetas), no mesmo nível
+                //    dela e com a borda do fundo alinhada à da fonte. Não usa os bounds do gabinete em X:
+                //    uma malha do PCCaseMM se estende ~14 unidades para fora do gabinete visível.
                 Vector3 psuFinal = psuZone != null ? r.InverseTransformPoint(FindSnapAnchor(psuZone).position) : psuB.center;
-                bool longIsX = caseB.size.x >= caseB.size.z;
-                Vector3 bay = psuFinal;
-                if (longIsX) bay.x = Mathf.Clamp(2f * caseB.center.x - psuFinal.x, caseB.min.x + hdB.extents.x, caseB.max.x - hdB.extents.x);
-                else bay.z = Mathf.Clamp(2f * caseB.center.z - psuFinal.z, caseB.min.z + hdB.extents.z, caseB.max.z - hdB.extents.z);
-                bay.y = caseB.min.y + caseB.size.y * 0.08f;
+                var bay = new Vector3(
+                    psuFinal.x + psuB.extents.x + hdB.size.x * 0.05f + hdB.extents.x,
+                    psuFinal.y - psuB.extents.y,
+                    psuFinal.z - (hdB.extents.z - psuB.extents.z));
 
-                // 3) Início: fora do gabinete, na mesma "raia" Z da baia (o gesto move o HD só no eixo X).
-                float gap = hdB.size.x;
-                float nearSide = bay.x >= caseB.center.x ? caseB.max.x + gap : caseB.min.x - gap;
-                float farSide = bay.x >= caseB.center.x ? caseB.min.x - gap : caseB.max.x + gap;
-                Vector3 start = new Vector3(nearSide, tableY, bay.z);
-                Bounds startB = new Bounds(start + Vector3.up * hdB.extents.y, hdB.size);
-                bool blocked = startB.Intersects(psuB) ||
-                               (monitor != null && startB.Intersects(LocalBounds(monitor, r)));
-                if (blocked) start.x = farSide;
+                // 3) Início: à esquerda da fonte, na mesma "raia" Z da baia (o gesto move o HD só no eixo X).
+                var start = new Vector3(psuB.min.x - hdB.size.x * 0.25f - hdB.extents.x, tableY, bay.z);
                 hd.transform.localPosition = start;
 
                 // 4) HardDriveSnapZone + SnapAnchor (mesmo padrão do ATX24PinSnapZone, filho da raiz).
@@ -126,8 +173,7 @@ namespace SavitGame.Editor.HardDriveSetup {
 
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
                 Debug.Log($"[HardDrivePrefabSetup] HD configurado em {prefabPath}: início={start} baia={bay} " +
-                          $"escala={scale:F4} sata={r.InverseTransformPoint(port.transform.position)}" +
-                          (blocked ? " (lado oposto: o lado da baia estava ocupado)" : ""));
+                          $"escala={scale:F4} sata={r.InverseTransformPoint(port.transform.position)}");
             }
             finally {
                 PrefabUtility.UnloadPrefabContents(root);
@@ -136,21 +182,31 @@ namespace SavitGame.Editor.HardDriveSetup {
 
         // Bounds das malhas no espaço de 'space'. Usa sharedMesh.bounds: funciona com objeto inativo.
         // Ignora cabos/conectores ATX para não esticar a caixa da fonte até a placa-mãe.
-        private static Bounds LocalBounds(Transform part, Transform space) {
+        private static Bounds LocalBounds(Transform part, Transform space, bool onlyVisible = false) {
             bool any = false;
             var b = new Bounds();
             foreach (var mf in part.GetComponentsInChildren<MeshFilter>(true)) {
                 if (mf.sharedMesh == null || IsCable(mf.transform, part)) continue;
-                Matrix4x4 m = space.worldToLocalMatrix * mf.transform.localToWorldMatrix;
-                Bounds mb = mf.sharedMesh.bounds;
-                for (int i = 0; i < 8; i++) {
-                    Vector3 corner = mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
-                    Vector3 p = m.MultiplyPoint3x4(corner);
-                    if (!any) { b = new Bounds(p, Vector3.zero); any = true; }
-                    else b.Encapsulate(p);
+                if (onlyVisible) {
+                    var rend = mf.GetComponent<Renderer>();
+                    if (!mf.gameObject.activeInHierarchy || rend == null || !rend.enabled) continue;
                 }
+                Bounds mb = MeshBounds(mf, space);
+                if (!any) { b = mb; any = true; }
+                else b.Encapsulate(mb);
             }
             return any ? b : new Bounds(space.InverseTransformPoint(part.position), Vector3.zero);
+        }
+
+        private static Bounds MeshBounds(MeshFilter mf, Transform space) {
+            Matrix4x4 m = space.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+            Bounds mb = mf.sharedMesh.bounds;
+            var b = new Bounds(m.MultiplyPoint3x4(mb.min), Vector3.zero);
+            for (int i = 0; i < 8; i++) {
+                Vector3 corner = mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                b.Encapsulate(m.MultiplyPoint3x4(corner));
+            }
+            return b;
         }
 
         private static bool IsCable(Transform t, Transform stop) {
