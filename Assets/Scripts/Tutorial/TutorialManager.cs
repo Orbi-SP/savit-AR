@@ -58,6 +58,10 @@ public class TutorialManager : MonoBehaviour
 	[Header("Áudio (opcional)")]
 	public AudioSource audioSource;
 
+	[Header("Layout")]
+	[Tooltip("Ajusta painéis e textos para tela deitada (âncoras proporcionais + auto-size). Desligue para usar o layout feito no Editor.")]
+	public bool autoLayout = true;
+
 	[Header("Etapas (na ordem)")]
 	public TutorialStep[] steps = DefaultSteps();
 
@@ -71,7 +75,65 @@ public class TutorialManager : MonoBehaviour
 	{
 		if (placementManager == null) placementManager = FindFirstObjectByType<ARPlacementManager>();
 		if (okButton != null) okButton.onClick.AddListener(OnOkPressed);
+		if (autoLayout) ApplyLandscapeLayout();
 		HideAll();
+	}
+
+	/// <summary>
+	/// O Canvas AR_UI usa Constant Pixel Size e os textos vinham com 200x50 px no centro:
+	/// a legenda quebrava a cada 2-3 palavras. Aqui tudo passa a ocupar a largura da tela deitada.
+	/// </summary>
+	private void ApplyLandscapeLayout()
+	{
+		// Legenda curta: faixa embaixo, largura toda.
+		if (hintPanel != null) Stretch(hintPanel.transform as RectTransform, new Vector2(0f, 0.02f), new Vector2(1f, 0.20f), Vector2.zero);
+		if (hintText != null)
+		{
+			Stretch(hintText.rectTransform, Vector2.zero, Vector2.one, new Vector2(40f, 8f));
+			FitText(hintText, 20f, 56f, TextAlignmentOptions.Center);
+		}
+
+		// Explicação: título em cima, texto no meio, "Entendi" embaixo.
+		if (titleText != null)
+		{
+			Stretch(titleText.rectTransform, new Vector2(0.06f, 0.80f), new Vector2(0.94f, 0.95f), Vector2.zero);
+			FitText(titleText, 28f, 72f, TextAlignmentOptions.Center);
+		}
+		if (bodyText != null)
+		{
+			Stretch(bodyText.rectTransform, new Vector2(0.06f, 0.24f), new Vector2(0.94f, 0.78f), Vector2.zero);
+			FitText(bodyText, 20f, 52f, TextAlignmentOptions.TopLeft);
+		}
+		if (okButton != null)
+		{
+			Stretch(okButton.transform as RectTransform, new Vector2(0.35f, 0.05f), new Vector2(0.65f, 0.19f), Vector2.zero);
+			var label = okButton.GetComponentInChildren<TMP_Text>(true);
+			if (label != null)
+			{
+				Stretch(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(10f, 4f));
+				FitText(label, 18f, 48f, TextAlignmentOptions.Center);
+			}
+		}
+	}
+
+	private static void Stretch(RectTransform rt, Vector2 anchorMin, Vector2 anchorMax, Vector2 padding)
+	{
+		if (rt == null) return;
+		rt.anchorMin = anchorMin;
+		rt.anchorMax = anchorMax;
+		rt.pivot = new Vector2(0.5f, 0.5f);
+		rt.offsetMin = padding;
+		rt.offsetMax = -padding;
+	}
+
+	private static void FitText(TMP_Text text, float minSize, float maxSize, TextAlignmentOptions alignment)
+	{
+		text.textWrappingMode = TextWrappingModes.Normal;
+		text.enableAutoSizing = true;
+		text.fontSizeMin = minSize;
+		text.fontSizeMax = maxSize;
+		text.alignment = alignment;
+		text.overflowMode = TextOverflowModes.Overflow;
 	}
 
 	private void OnDestroy()
