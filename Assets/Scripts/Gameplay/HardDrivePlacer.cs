@@ -26,8 +26,10 @@ public class HardDrivePlacer : MonoBehaviour
 	public float snapTolerance = 0.05f;
 
 	[Header("Animação - Colocar na baia")]
-	[Tooltip("De onde o HD começa a deslizar para dentro da baia, no forward do SnapAnchor (em tamanhos do HD).")]
+	[Tooltip("De onde o HD começa a deslizar para dentro da baia (em tamanhos do HD).")]
 	public float entryOffset = 0.8f;
+	[Tooltip("Entra por cima (up do SnapAnchor): no AR o gabinete fica deitado e aberto para cima. Desligado = forward do SnapAnchor.")]
+	public bool entryFromAbove = true;
 	public float approachDuration = 0.3f;
 	public float slideDuration = 0.6f;
 
@@ -199,7 +201,8 @@ public class HardDrivePlacer : MonoBehaviour
 	private IEnumerator InstallSequence()
 	{
 		// 1) Colocar: o HD vai até a frente da baia e desliza para dentro.
-		Vector3 bayEntry = snapAnchor.position + snapAnchor.forward * (hdSize * entryOffset);
+		Vector3 entryDir = entryFromAbove ? snapAnchor.up : snapAnchor.forward;
+		Vector3 bayEntry = snapAnchor.position + entryDir * (hdSize * entryOffset);
 		yield return MoveTo(bayEntry, snapAnchor.rotation, approachDuration);
 		yield return MoveTo(snapAnchor.position, snapAnchor.rotation, slideDuration);
 		Debug.Log("[HardDrivePlacer] HD colocado na baia.");
