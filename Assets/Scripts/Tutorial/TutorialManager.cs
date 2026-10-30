@@ -50,6 +50,8 @@ public class TutorialManager : MonoBehaviour
 	public TMP_Text titleText;
 	public TMP_Text bodyText;
 	public Button okButton;
+	[Tooltip("Texto do botão que fecha a explicação (na cena ele vinha como \"Button\").")]
+	public string okButtonText = "Entendi";
 
 	[Header("Legenda curta (durante o encaixe)")]
 	public GameObject hintPanel;
@@ -74,9 +76,29 @@ public class TutorialManager : MonoBehaviour
 	private void Awake()
 	{
 		if (placementManager == null) placementManager = FindFirstObjectByType<ARPlacementManager>();
-		if (okButton != null) okButton.onClick.AddListener(OnOkPressed);
+		if (okButton != null)
+		{
+			okButton.onClick.AddListener(OnOkPressed);
+			var label = okButton.GetComponentInChildren<TMP_Text>(true);
+			if (label != null && !string.IsNullOrEmpty(okButtonText)) label.text = okButtonText;
+		}
+		else
+		{
+			Debug.LogWarning("[TutorialManager] okButton não atribuído: a explicação não vai fechar.");
+		}
+
+		// Textos só exibem: não podem "roubar" o toque do botão quando ficam por cima dele.
+		DisableRaycast(titleText);
+		DisableRaycast(bodyText);
+		DisableRaycast(hintText);
+
 		if (autoLayout) ApplyLandscapeLayout();
 		HideAll();
+	}
+
+	private static void DisableRaycast(TMP_Text text)
+	{
+		if (text != null) text.raycastTarget = false;
 	}
 
 	/// <summary>
@@ -160,6 +182,7 @@ public class TutorialManager : MonoBehaviour
 
 	public void OnOkPressed()
 	{
+		Debug.Log($"[TutorialManager] \"{okButtonText}\" pressionado (etapa {CurrentStepIndex}).");
 		okPressed = true;
 	}
 
