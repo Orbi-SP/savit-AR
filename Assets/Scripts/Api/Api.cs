@@ -98,7 +98,7 @@ public class Api : MonoBehaviour
         }
 
         // Notifica liberação
-        if (prevHolding && !isHolding && currentHeld != null)
+        if (prevHolding && !isHolding && currentHeld != null && !TutorialGate.InputLocked)
         {
             var releasable = currentHeld.GetComponent<IReleasable>();
             releasable?.OnRelease();

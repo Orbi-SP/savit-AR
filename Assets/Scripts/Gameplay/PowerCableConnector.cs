@@ -226,6 +226,9 @@ public class PowerCableConnector : MonoBehaviour
 			return;
 		}
 
+		// Explicação do tutorial aberta: não deixa pegar o conector.
+		if (TutorialGate.InputLocked) { prevHolding = false; return; }
+
 		bool holding = api != null && api.currentScene == Api.SceneType.Gabinete && api.IsHolding;
 
 		// Ao começar a segurar, captura o offset para evitar "teleporte" do conector.

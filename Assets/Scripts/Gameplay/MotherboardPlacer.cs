@@ -97,6 +97,8 @@ public class MotherboardPlacer : MonoBehaviour
         ResolveRefsIfNeeded();
         if (api == null) return;
         if (api.currentScene != Api.SceneType.Gabinete) return;
+        // Explicação do tutorial aberta: não deixa pegar a peça.
+        if (TutorialGate.InputLocked) { prevHolding = false; return; }
 
         // Antes da RAM estar instalada, a placa-mãe não deve sequer “levantar/mover”.
         bool requirementsOk = motherboardState == null || motherboardState.HasRequiredMemory;
