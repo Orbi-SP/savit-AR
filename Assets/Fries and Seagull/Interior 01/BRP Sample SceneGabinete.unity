@@ -2837,11 +2837,12 @@ MonoBehaviour:
   - id: hd
     title: "HD (disco r\xEDgido)"
     explanation: "O HD \xE9 o armazenamento do computador: \xE9 onde ficam guardados
-      o sistema operacional, os programas e os seus arquivos, mesmo com o PC desligado."
+      o sistema operacional, os programas e os seus arquivos, mesmo com o PC desligado.\n\nEle
+      \xE9 parafusado no gabinete e ligado \xE0 placa-m\xE3e pelo cabo SATA."
     actionHint: Segure o HD e encaixe-o na baia do gabinete.
     voice: {fileID: 0}
-    componentType: HDPlacer
-    doneProperty: IsSnapped
+    componentType: HardDrivePlacer
+    doneProperty: IsInstalled
   - id: fim
     title: "Parab\xE9ns!"
     explanation: "Voc\xEA concluiu a montagem das pe\xE7as do computador. Muito bem!"
