@@ -45,8 +45,8 @@ public class HardDrivePlacer : MonoBehaviour
 	public float cableDuration = 0.8f;
 	[Tooltip("Espessura do cabo em relação ao tamanho do HD.")]
 	public float cableWidth = 0.04f;
-	[Tooltip("Arco do cabo (para cima, visível de cima no AR) em relação à distância entre o HD e a placa-mãe.")]
-	public float cableSag = 0.25f;
+	[Tooltip("Folga do cabo para cima (em relação à distância HD–placa): ele sobe do HD, passa por cima das gavetas e desce na porta.")]
+	public float cableSag = 0.15f;
 	public int cableSegments = 16;
 	[Tooltip("Liga o SATA ao lado do conector de 24 pinos em vez da SATAPort_Placa. Sem SATAPort_Placa, esse é sempre o caminho.")]
 	public bool sataNextToAtx24 = false;
@@ -357,7 +357,7 @@ public class HardDrivePlacer : MonoBehaviour
 	{
 		Vector3 start = sataConnector != null ? GetCenter(sataConnector) : transform.position;
 		Vector3 end = SataEnd;
-		Vector3 control = ArcControl(start, end);
+		CableControls(start, end, out Vector3 c1, out Vector3 c2);
 
 		int segments = Mathf.Max(2, cableSegments);
 		cable.positionCount = segments + 1;
@@ -365,16 +365,21 @@ public class HardDrivePlacer : MonoBehaviour
 		{
 			float s = cableProgress * i / segments;
 			float u = 1f - s;
-			cable.SetPosition(i, u * u * start + 2f * u * s * control + s * s * end);
+			cable.SetPosition(i, u * u * u * start + 3f * u * u * s * c1 + 3f * u * s * s * c2 + s * s * s * end);
 		}
 
 		if (sataPlug != null) sataPlug.position = end;
 	}
 
-	// O arco sobe (up do HD): no AR o gabinete fica deitado e é visto de cima; para baixo o cabo some no fundo.
-	private Vector3 ArcControl(Vector3 start, Vector3 end)
+	// Bézier cúbica: sobe do HD, segue na altura das gavetas e desce na porta. Com uma curva simples
+	// o cabo atravessava a tampa da gaiola de discos (o gabinete fica deitado e é visto de cima no AR).
+	private void CableControls(Vector3 start, Vector3 end, out Vector3 c1, out Vector3 c2)
 	{
-		return (start + end) * 0.5f + transform.up * (Vector3.Distance(start, end) * cableSag);
+		Vector3 up = transform.parent != null ? transform.parent.up : Vector3.up;
+		float lift = Vector3.Distance(start, end) * cableSag;
+		float rise = Mathf.Max(0f, Vector3.Dot(start - end, up));
+		c1 = start + up * lift;
+		c2 = end + up * (rise + lift);
 	}
 
 	private void CreatePlug()
@@ -386,7 +391,8 @@ public class HardDrivePlacer : MonoBehaviour
 		// Conector na ponta do cabo, apontando para a placa (mesma direção em que o cabo chega).
 		Vector3 start = sataConnector != null ? GetCenter(sataConnector) : transform.position;
 		Vector3 end = SataEnd;
-		Vector3 arrive = end - ArcControl(start, end);
+		CableControls(start, end, out _, out Vector3 c2);
+		Vector3 arrive = end - c2;
 		Quaternion rot = arrive.sqrMagnitude > 1e-8f ? Quaternion.LookRotation(arrive, transform.up) : transform.rotation;
 
 		float size = hdSize * cableWidth;
