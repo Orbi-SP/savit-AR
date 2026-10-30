@@ -100,6 +100,8 @@ namespace SavitGame.AR {
         public UnityEvent onScenePlaced;
 
         private GameObject spawnedScene;
+        /// <summary>Cena de jogo posicionada no AR (null antes de "Colocar Aqui").</summary>
+        public GameObject SpawnedScene => spawnedScene;
         private GameObject ghostInstance;
         private bool isPlaced = false;
         private bool placementAllowed = false;
