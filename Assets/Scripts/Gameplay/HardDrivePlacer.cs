@@ -45,9 +45,13 @@ public class HardDrivePlacer : MonoBehaviour
 	public float cableDuration = 0.8f;
 	[Tooltip("Espessura do cabo em relação ao tamanho do HD.")]
 	public float cableWidth = 0.04f;
-	[Tooltip("Barriga do cabo em relação à distância entre o HD e a placa-mãe.")]
+	[Tooltip("Arco do cabo (para cima, visível de cima no AR) em relação à distância entre o HD e a placa-mãe.")]
 	public float cableSag = 0.25f;
 	public int cableSegments = 16;
+	[Tooltip("Liga o SATA na placa ao lado do conector de 24 pinos já conectado (mesmo ponto onde o cabo ATX encaixou). Desligado = usa SATAPort_Placa.")]
+	public bool sataNextToAtx24 = true;
+	[Tooltip("Distância da porta SATA até o conector de 24 pinos, para dentro da placa-mãe (em tamanhos do HD).")]
+	public float sataOffsetFromAtx24 = 0.25f;
 
 	[Header("Eventos")]
 	public UnityEvent onInstalled;
@@ -66,6 +70,8 @@ public class HardDrivePlacer : MonoBehaviour
 	private readonly List<Transform> screws = new List<Transform>();
 	private Transform sataConnector;
 	private LineRenderer cable;
+	private Transform sataPlug;
+	private Vector3 sataEndLocal; // fim do cabo no espaço do pai do HD (a cena AR pode ser reancorada)
 	private float cableProgress;
 	private float hdSize;
 
@@ -212,11 +218,11 @@ public class HardDrivePlacer : MonoBehaviour
 			yield return ScrewIn(screw);
 		Debug.Log("[HardDrivePlacer] HD parafusado no gabinete.");
 
-		// 3) Ligar na placa-mãe: o cabo SATA sai do HD até a porta da placa.
-		if (sataPortPlaca != null)
+		// 3) Ligar na placa-mãe: o cabo SATA sai do HD e encaixa na placa, ao lado do 24 pinos.
+		if (ResolveSataEnd())
 			yield return ConnectCable();
 		else
-			Debug.LogWarning("[HardDrivePlacer] SATAPort_Placa nao atribuido; cabo SATA nao sera desenhado.");
+			Debug.LogWarning("[HardDrivePlacer] Sem cabo ATX nem SATAPort_Placa; cabo SATA nao sera desenhado.");
 
 		IsInstalled = true;
 		Debug.Log("✅ HD instalado (colocado, parafusado e ligado na placa-mãe).");
@@ -262,6 +268,45 @@ public class HardDrivePlacer : MonoBehaviour
 		screw.SetPositionAndRotation(seatedPos, seatedRot);
 	}
 
+	/// <summary>
+	/// Onde o cabo SATA termina. Preferência: ao lado do conector de 24 pinos já ligado — é o ponto real da
+	/// placa-mãe onde o cabo ATX encaixou —, deslocado para dentro da placa. Sem cabo ATX, usa SATAPort_Placa.
+	/// </summary>
+	private bool ResolveSataEnd()
+	{
+		Vector3 endWorld;
+		Transform atx = sataNextToAtx24 && powerCable != null && powerCable.IsConnected ? powerCable.mbConnector : null;
+		if (atx != null)
+		{
+			Vector3 inward = Vector3.zero;
+			var board = FindBoard();
+			if (board != null && TryGetRendererBounds(board, out Bounds bb)) inward = bb.center - atx.position;
+			inward = Vector3.ProjectOnPlane(inward, transform.up);
+			if (inward.sqrMagnitude < 1e-8f) inward = Vector3.ProjectOnPlane(atx.position - transform.position, transform.up);
+			endWorld = atx.position + inward.normalized * (hdSize * sataOffsetFromAtx24);
+		}
+		else if (sataPortPlaca != null)
+		{
+			endWorld = sataPortPlaca.position;
+		}
+		else
+		{
+			return false;
+		}
+
+		sataEndLocal = transform.parent != null ? transform.parent.InverseTransformPoint(endWorld) : endWorld;
+		return true;
+	}
+
+	private Vector3 SataEnd => transform.parent != null ? transform.parent.TransformPoint(sataEndLocal) : sataEndLocal;
+
+	private Transform FindBoard()
+	{
+		var root = transform.parent != null ? transform.parent : transform.root;
+		var placer = root.GetComponentInChildren<MotherboardPlacer>(true);
+		return placer != null ? placer.transform : null;
+	}
+
 	private IEnumerator ConnectCable()
 	{
 		cable = CreateCable();
@@ -274,6 +319,7 @@ public class HardDrivePlacer : MonoBehaviour
 
 		cableProgress = 1f;
 		CreatePlug();
+		Debug.Log("[HardDrivePlacer] Cabo SATA ligado na placa-mãe.");
 	}
 
 	private LineRenderer CreateCable()
@@ -306,11 +352,9 @@ public class HardDrivePlacer : MonoBehaviour
 
 	private void UpdateCable()
 	{
-		if (sataPortPlaca == null) return;
-
 		Vector3 start = sataConnector != null ? GetCenter(sataConnector) : transform.position;
-		Vector3 end = sataPortPlaca.position;
-		Vector3 control = (start + end) * 0.5f + Vector3.down * (Vector3.Distance(start, end) * cableSag);
+		Vector3 end = SataEnd;
+		Vector3 control = ArcControl(start, end);
 
 		int segments = Mathf.Max(2, cableSegments);
 		cable.positionCount = segments + 1;
@@ -320,6 +364,14 @@ public class HardDrivePlacer : MonoBehaviour
 			float u = 1f - s;
 			cable.SetPosition(i, u * u * start + 2f * u * s * control + s * s * end);
 		}
+
+		if (sataPlug != null) sataPlug.position = end;
+	}
+
+	// O arco sobe (up do HD): no AR o gabinete fica deitado e é visto de cima; para baixo o cabo some no fundo.
+	private Vector3 ArcControl(Vector3 start, Vector3 end)
+	{
+		return (start + end) * 0.5f + transform.up * (Vector3.Distance(start, end) * cableSag);
 	}
 
 	private void CreatePlug()
@@ -328,12 +380,43 @@ public class HardDrivePlacer : MonoBehaviour
 		plug.name = "SATA_Plug";
 		Destroy(plug.GetComponent<Collider>());
 
-		plug.transform.SetPositionAndRotation(sataPortPlaca.position, sataPortPlaca.rotation);
-		plug.transform.localScale = Vector3.one * (hdSize * cableWidth * 2.5f);
-		plug.transform.SetParent(sataPortPlaca, worldPositionStays: true);
+		// Conector na ponta do cabo, apontando para a placa (mesma direção em que o cabo chega).
+		Vector3 start = sataConnector != null ? GetCenter(sataConnector) : transform.position;
+		Vector3 end = SataEnd;
+		Vector3 arrive = end - ArcControl(start, end);
+		Quaternion rot = arrive.sqrMagnitude > 1e-8f ? Quaternion.LookRotation(arrive, transform.up) : transform.rotation;
+
+		float size = hdSize * cableWidth;
+		plug.transform.SetParent(cable.transform, false);
+		plug.transform.SetPositionAndRotation(end, rot);
+		plug.transform.localScale = Vector3.one;
+		plug.transform.localScale = DivideByLossy(plug.transform, new Vector3(size * 2.2f, size * 1.2f, size * 2.8f));
+		sataPlug = plug.transform;
 
 		var rend = plug.GetComponent<Renderer>();
 		if (rend != null) rend.material.color = Color.black;
+	}
+
+	private static Vector3 DivideByLossy(Transform t, Vector3 worldSize)
+	{
+		Vector3 parentScale = t.parent != null ? t.parent.lossyScale : Vector3.one;
+		return new Vector3(
+			worldSize.x / Mathf.Max(Mathf.Abs(parentScale.x), 1e-6f),
+			worldSize.y / Mathf.Max(Mathf.Abs(parentScale.y), 1e-6f),
+			worldSize.z / Mathf.Max(Mathf.Abs(parentScale.z), 1e-6f));
+	}
+
+	private static bool TryGetRendererBounds(Transform t, out Bounds bounds)
+	{
+		bounds = default;
+		bool any = false;
+		foreach (var r in t.GetComponentsInChildren<Renderer>())
+		{
+			if (!r.enabled) continue;
+			if (!any) { bounds = r.bounds; any = true; }
+			else bounds.Encapsulate(r.bounds);
+		}
+		return any;
 	}
 
 	private float GetSize()
