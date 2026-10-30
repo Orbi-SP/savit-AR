@@ -306,6 +306,7 @@ namespace SavitGame.Editor.HardDriveSetup {
             public Vector2 moveLimits;
             public float moveSpeed;
             public float liftY;
+            public float cableSag;
         }
 #pragma warning restore 0649
 
@@ -364,6 +365,7 @@ namespace SavitGame.Editor.HardDriveSetup {
                     placer.moveLimits = layout.moveLimits;
                     placer.moveSpeed = layout.moveSpeed;
                     placer.liftY = layout.liftY;
+                    if (layout.cableSag > 0f) placer.cableSag = layout.cableSag;
                     placer.sataPortPlaca = port;
                     placer.sataNextToAtx24 = false;
                     placer.snapAnchor = anchor;
