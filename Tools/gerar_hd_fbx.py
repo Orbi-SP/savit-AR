@@ -2,8 +2,8 @@
 Gera o modelo 3D de um HD SATA 3.5" para o SAVIT.
 
 Uso:
-    python Tools/gerar_hd_fbx.py          -> Assets/Models/HardDrive/HardDrive.fbx (FBX 7.4 ASCII)
-    python Tools/gerar_hd_fbx.py --obj    -> Assets/Models/HardDrive/HardDrive.obj (+ .mtl), contingência
+    python Tools/gerar_hd_fbx.py          -> Assets/Fries and Seagull/Interior 01/PCParts/HD/HardDrive.fbx (FBX 7.4 ASCII)
+    python Tools/gerar_hd_fbx.py --obj    -> .../PCParts/HD/HardDrive.obj (+ .mtl), contingência
 
 Medidas reais em centímetros (UnitScaleFactor = 1). No Unity, deixe "Convert Units" marcado.
 Filhos gerados: HD_Body, HD_PCB, HD_Label, HD_SATA_Data, HD_SATA_Power, Screw_0..Screw_3.
@@ -15,7 +15,8 @@ import os
 from datetime import datetime
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(REPO, "Assets", "Models", "HardDrive")
+# Mesmo padrão da fonte (PCParts/Fonte).
+OUT_DIR = os.path.join(REPO, "Assets", "Fries and Seagull", "Interior 01", "PCParts", "HD")
 
 # Medidas do HD 3.5" (cm): largura (X), altura (Y), comprimento (Z). Traseira (conectores) em -Z.
 W, H, L = 10.16, 2.61, 14.70
