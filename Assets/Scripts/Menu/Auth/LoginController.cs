@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,15 +28,21 @@ public class LoginController : MonoBehaviour
     private RectTransform cardRect;
     private bool? lastPortrait;
 
+    // Âncoras de cada elemento do cartão: deitado (cartão no centro) e em pé (tela inteira).
+    private readonly List<(RectTransform rt, Vector2 landMin, Vector2 landMax, Vector2 portMin, Vector2 portMax)> layout =
+        new List<(RectTransform, Vector2, Vector2, Vector2, Vector2)>();
+
     private void Update()
     {
-        // Em pé o cartão ocupa quase toda a largura; deitado, só o centro da tela.
+        // Em pé o login ocupa a tela inteira; deitado, é um cartão no centro.
         bool portrait = Screen.height > Screen.width;
         if (cardRect != null && portrait != lastPortrait)
         {
             lastPortrait = portrait;
-            if (portrait) Stretch(cardRect, new Vector2(0.06f, 0.2f), new Vector2(0.94f, 0.8f), Vector2.zero);
+            if (portrait) Stretch(cardRect, Vector2.zero, Vector2.one, Vector2.zero);
             else Stretch(cardRect, new Vector2(0.28f, 0.08f), new Vector2(0.72f, 0.92f), Vector2.zero);
+            foreach (var e in layout)
+                Stretch(e.rt, portrait ? e.portMin : e.landMin, portrait ? e.portMax : e.landMax, Vector2.zero);
         }
 
         // A tela gira (login em pé, jogo deitado): a letra dos campos acompanha a altura real deles.
@@ -157,24 +164,40 @@ public class LoginController : MonoBehaviour
         var card = Panel("LoginCard", overlay.transform, new Vector2(0.28f, 0.08f), new Vector2(0.72f, 0.92f), new Color(0.12f, 0.12f, 0.15f, 0.97f));
         cardRect = card.GetComponent<RectTransform>();
 
-        Label(card.transform, "Entrar no SAVIT", new Vector2(0.05f, 0.85f), new Vector2(0.95f, 0.96f), 20f, 44f, FontStyles.Bold);
-        Label(card.transform, "Entre com seu e-mail e senha.", new Vector2(0.05f, 0.76f), new Vector2(0.95f, 0.84f), 12f, 24f, FontStyles.Normal);
+        // Âncoras deitado na criação; as de "em pé" (tela inteira, botões empilhados) vão no Portrait(...).
+        var title = Label(card.transform, "Entrar no SAVIT", new Vector2(0.05f, 0.85f), new Vector2(0.95f, 0.96f), 20f, 44f, FontStyles.Bold);
+        Portrait(title, new Vector2(0.08f, 0.78f), new Vector2(0.92f, 0.86f));
+        var subtitle = Label(card.transform, "Entre com seu e-mail e senha.", new Vector2(0.05f, 0.76f), new Vector2(0.95f, 0.84f), 12f, 24f, FontStyles.Normal);
+        Portrait(subtitle, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.77f));
 
         emailInput = CreateInput(card.transform, resources, "E-mail", new Vector2(0.08f, 0.61f), new Vector2(0.92f, 0.72f), false);
+        Portrait(emailInput, new Vector2(0.08f, 0.62f), new Vector2(0.92f, 0.68f));
         passwordInput = CreateInput(card.transform, resources, "Senha", new Vector2(0.08f, 0.47f), new Vector2(0.92f, 0.58f), true);
+        Portrait(passwordInput, new Vector2(0.08f, 0.54f), new Vector2(0.92f, 0.60f));
         passwordInput.onSubmit.AddListener(_ => SignIn());
 
         statusText = Label(card.transform, "", new Vector2(0.05f, 0.35f), new Vector2(0.95f, 0.45f), 11f, 20f, FontStyles.Normal);
+        Portrait(statusText, new Vector2(0.08f, 0.46f), new Vector2(0.92f, 0.53f));
 
         signInButton = ButtonWithText(card.transform, resources, "Entrar", new Vector2(0.08f, 0.19f), new Vector2(0.48f, 0.31f), SignIn);
-        ButtonWithText(card.transform, resources, "Criar conta", new Vector2(0.52f, 0.19f), new Vector2(0.92f, 0.31f), OpenSignUpSite);
-        ButtonWithText(card.transform, resources, "Sair do jogo", new Vector2(0.32f, 0.05f), new Vector2(0.68f, 0.14f), Application.Quit);
+        Portrait(signInButton, new Vector2(0.08f, 0.37f), new Vector2(0.92f, 0.44f));
+        var signUpButton = ButtonWithText(card.transform, resources, "Criar conta", new Vector2(0.52f, 0.19f), new Vector2(0.92f, 0.31f), OpenSignUpSite);
+        Portrait(signUpButton, new Vector2(0.08f, 0.28f), new Vector2(0.92f, 0.35f));
+        var quitButton = ButtonWithText(card.transform, resources, "Sair do jogo", new Vector2(0.32f, 0.05f), new Vector2(0.68f, 0.14f), Application.Quit);
+        Portrait(quitButton, new Vector2(0.25f, 0.17f), new Vector2(0.75f, 0.23f));
 
         loggedBar = Panel("LoggedBar", canvas, new Vector2(0.60f, 0.88f), new Vector2(0.99f, 0.98f), new Color(0f, 0f, 0f, 0.55f));
         greetingText = Label(loggedBar.transform, "", new Vector2(0.03f, 0f), new Vector2(0.55f, 1f), 11f, 22f, FontStyles.Normal);
         ButtonWithText(loggedBar.transform, resources, "Trocar usuário", new Vector2(0.58f, 0.12f), new Vector2(0.98f, 0.88f), SignOut);
 
         overlay.transform.SetAsLastSibling();
+    }
+
+    /// <summary>Guarda as âncoras atuais (deitado) e as de em pé, para trocar quando a tela girar.</summary>
+    private void Portrait(Component element, Vector2 portraitMin, Vector2 portraitMax)
+    {
+        var rt = (RectTransform)element.transform;
+        layout.Add((rt, rt.anchorMin, rt.anchorMax, portraitMin, portraitMax));
     }
 
     private static GameObject Panel(string name, Transform parent, Vector2 min, Vector2 max, Color color)
