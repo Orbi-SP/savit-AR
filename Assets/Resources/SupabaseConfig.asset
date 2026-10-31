@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SupabaseConfig
   url: https://eyakfzeaqhroiatvomog.supabase.co
   anonKey: sb_publishable_XNKkhBjwjQJZXjv1E_K-dA_u6ZCo4Ji
+  signupUrl:

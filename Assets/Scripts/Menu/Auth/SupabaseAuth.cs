@@ -159,7 +159,7 @@ public static class SupabaseAuth
         {
             case "network": return "Sem conexão com a internet. Verifique e tente de novo.";
             case "invalid_credentials":
-            case "invalid_grant": return "E-mail ou senha incorretos. Ainda não tem conta? Crie no site do SAVIT.";
+            case "invalid_grant": return "E-mail ou senha incorretos. Ainda não tem conta? Toque em Criar conta.";
             case "email_not_confirmed": return "Confirme seu e-mail pelo link enviado quando a conta foi criada.";
             case "email_provider_disabled": return "Login por e-mail desativado no Supabase (Authentication > Sign In / Providers > Email).";
             case "over_request_rate_limit": return "Muitas tentativas. Aguarde um pouco e tente de novo.";

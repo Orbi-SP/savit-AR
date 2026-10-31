@@ -14,6 +14,9 @@ public class SupabaseConfig : ScriptableObject
     [Tooltip("Chave pública: \"anon public\" ou \"publishable\" (Settings > API Keys). Nunca a service_role.")]
     [TextArea(2, 6)] public string anonKey = "";
 
+    [Tooltip("Página do site do SAVIT onde o aluno cria a conta (aberta pelo botão \"Criar conta\").")]
+    public string signupUrl = "";
+
     private static SupabaseConfig cached;
 
     public bool IsValid => !string.IsNullOrWhiteSpace(url) && !string.IsNullOrWhiteSpace(anonKey);

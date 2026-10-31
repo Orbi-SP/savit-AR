@@ -6,7 +6,8 @@ using UnityEngine.UI;
 /// <summary>
 /// Tela de login do menu (e-mail + senha no Supabase). Montada por código por cima do Canvas do menu,
 /// sem mexer nos objetos da cena: enquanto ninguém entra, o "Iniciar Jogo" fica escondido.
-/// As contas são criadas no site do SAVIT (não há cadastro no app). Adicionada pelo MenuController.
+/// "Criar conta" abre o site do SAVIT (SupabaseConfig.signupUrl). Adicionada pelo MenuController.
+/// O login é em pé; depois de entrar a tela volta a ficar deitada, como o resto do menu e o jogo.
 /// </summary>
 public class LoginController : MonoBehaviour
 {
@@ -22,6 +23,29 @@ public class LoginController : MonoBehaviour
     private TMP_Text greetingText;
     private Button signInButton;
     private bool busy;
+    private float lastInputHeight;
+    private RectTransform cardRect;
+    private bool? lastPortrait;
+
+    private void Update()
+    {
+        // Em pé o cartão ocupa quase toda a largura; deitado, só o centro da tela.
+        bool portrait = Screen.height > Screen.width;
+        if (cardRect != null && portrait != lastPortrait)
+        {
+            lastPortrait = portrait;
+            if (portrait) Stretch(cardRect, new Vector2(0.06f, 0.2f), new Vector2(0.94f, 0.8f), Vector2.zero);
+            else Stretch(cardRect, new Vector2(0.28f, 0.08f), new Vector2(0.72f, 0.92f), Vector2.zero);
+        }
+
+        // A tela gira (login em pé, jogo deitado): a letra dos campos acompanha a altura real deles.
+        if (emailInput == null) return;
+        float height = ((RectTransform)emailInput.transform).rect.height;
+        if (Mathf.Abs(height - lastInputHeight) < 0.5f) return;
+        lastInputHeight = height;
+        FitInputText(emailInput, height);
+        FitInputText(passwordInput, height);
+    }
 
     private void Start()
     {
@@ -36,12 +60,13 @@ public class LoginController : MonoBehaviour
         BuildUi(canvas.transform);
         ShowLoggedIn(false);
 
-        // Sessão salva no aparelho: entra direto.
+        // Sessão salva no aparelho: entra direto (continua deitado). Sem sessão, o login fica em pé.
         SetBusy(true, "Entrando...");
         StartCoroutine(SupabaseAuth.TryRestore(ok =>
         {
             SetBusy(false, ok ? null : "");
             ShowLoggedIn(ok);
+            ApplyOrientation(ok);
         }));
     }
 
@@ -52,6 +77,18 @@ public class LoginController : MonoBehaviour
         StartCoroutine(SupabaseAuth.SignIn(emailInput.text, passwordInput.text, OnAuthResult));
     }
 
+    /// <summary>Cadastro é feito no site do SAVIT.</summary>
+    public void OpenSignUpSite()
+    {
+        var config = SupabaseConfig.Load();
+        if (config == null || string.IsNullOrWhiteSpace(config.signupUrl))
+        {
+            SetBusy(false, "Endereço do site de cadastro não configurado (SupabaseConfig > Signup Url).");
+            return;
+        }
+        Application.OpenURL(config.signupUrl);
+    }
+
     public void SignOut()
     {
         if (busy) return;
@@ -60,6 +97,7 @@ public class LoginController : MonoBehaviour
             passwordInput.text = "";
             SetBusy(false, "");
             ShowLoggedIn(false);
+            ApplyOrientation(false);
         }));
     }
 
@@ -68,6 +106,26 @@ public class LoginController : MonoBehaviour
         SetBusy(false, ok ? null : error);
         if (ok) passwordInput.text = "";
         ShowLoggedIn(ok);
+        if (ok) ApplyOrientation(true);
+    }
+
+    /// <summary>
+    /// Login em pé; logado, volta ao padrão do projeto (Player Settings): rotação automática só em paisagem.
+    /// No Editor não tem efeito (a Game view mantém a resolução escolhida).
+    /// </summary>
+    private static void ApplyOrientation(bool loggedIn)
+    {
+        if (!loggedIn)
+        {
+            Screen.orientation = ScreenOrientation.Portrait;
+            return;
+        }
+
+        Screen.autorotateToPortrait = false;
+        Screen.autorotateToPortraitUpsideDown = false;
+        Screen.autorotateToLandscapeLeft = true;
+        Screen.autorotateToLandscapeRight = true;
+        Screen.orientation = ScreenOrientation.AutoRotation;
     }
 
     private void ShowLoggedIn(bool loggedIn)
@@ -97,21 +155,23 @@ public class LoginController : MonoBehaviour
 
         overlay = Panel("LoginOverlay", canvas, Vector2.zero, Vector2.one, new Color(0f, 0f, 0f, 0.85f));
         var card = Panel("LoginCard", overlay.transform, new Vector2(0.28f, 0.08f), new Vector2(0.72f, 0.92f), new Color(0.12f, 0.12f, 0.15f, 0.97f));
+        cardRect = card.GetComponent<RectTransform>();
 
-        Label(card.transform, "Entrar no SAVIT", new Vector2(0.05f, 0.84f), new Vector2(0.95f, 0.97f), 30f, 64f, FontStyles.Bold);
-        Label(card.transform, "Use o e-mail e a senha cadastrados no site do SAVIT.", new Vector2(0.05f, 0.74f), new Vector2(0.95f, 0.84f), 16f, 34f, FontStyles.Normal);
+        Label(card.transform, "Entrar no SAVIT", new Vector2(0.05f, 0.85f), new Vector2(0.95f, 0.96f), 20f, 44f, FontStyles.Bold);
+        Label(card.transform, "Entre com seu e-mail e senha.", new Vector2(0.05f, 0.76f), new Vector2(0.95f, 0.84f), 12f, 24f, FontStyles.Normal);
 
-        emailInput = CreateInput(card.transform, resources, "E-mail", new Vector2(0.08f, 0.58f), new Vector2(0.92f, 0.71f), false);
-        passwordInput = CreateInput(card.transform, resources, "Senha", new Vector2(0.08f, 0.43f), new Vector2(0.92f, 0.56f), true);
+        emailInput = CreateInput(card.transform, resources, "E-mail", new Vector2(0.08f, 0.61f), new Vector2(0.92f, 0.72f), false);
+        passwordInput = CreateInput(card.transform, resources, "Senha", new Vector2(0.08f, 0.47f), new Vector2(0.92f, 0.58f), true);
         passwordInput.onSubmit.AddListener(_ => SignIn());
 
-        statusText = Label(card.transform, "", new Vector2(0.05f, 0.31f), new Vector2(0.95f, 0.42f), 14f, 30f, FontStyles.Normal);
+        statusText = Label(card.transform, "", new Vector2(0.05f, 0.35f), new Vector2(0.95f, 0.45f), 11f, 20f, FontStyles.Normal);
 
-        signInButton = ButtonWithText(card.transform, resources, "Entrar", new Vector2(0.20f, 0.15f), new Vector2(0.80f, 0.28f), SignIn);
-        ButtonWithText(card.transform, resources, "Sair do jogo", new Vector2(0.32f, 0.03f), new Vector2(0.68f, 0.12f), Application.Quit);
+        signInButton = ButtonWithText(card.transform, resources, "Entrar", new Vector2(0.08f, 0.19f), new Vector2(0.48f, 0.31f), SignIn);
+        ButtonWithText(card.transform, resources, "Criar conta", new Vector2(0.52f, 0.19f), new Vector2(0.92f, 0.31f), OpenSignUpSite);
+        ButtonWithText(card.transform, resources, "Sair do jogo", new Vector2(0.32f, 0.05f), new Vector2(0.68f, 0.14f), Application.Quit);
 
         loggedBar = Panel("LoggedBar", canvas, new Vector2(0.60f, 0.88f), new Vector2(0.99f, 0.98f), new Color(0f, 0f, 0f, 0.55f));
-        greetingText = Label(loggedBar.transform, "", new Vector2(0.03f, 0f), new Vector2(0.55f, 1f), 14f, 34f, FontStyles.Normal);
+        greetingText = Label(loggedBar.transform, "", new Vector2(0.03f, 0f), new Vector2(0.55f, 1f), 11f, 22f, FontStyles.Normal);
         ButtonWithText(loggedBar.transform, resources, "Trocar usuário", new Vector2(0.58f, 0.12f), new Vector2(0.98f, 0.88f), SignOut);
 
         overlay.transform.SetAsLastSibling();
@@ -158,11 +218,17 @@ public class LoginController : MonoBehaviour
         input.characterLimit = password ? 72 : 254;
         input.lineType = TMP_InputField.LineType.SingleLine;
 
-        // Texto proporcional à altura da tela (o Canvas do menu é Constant Pixel Size).
-        float size = Mathf.Max(18f, Screen.height * 0.04f);
-        input.pointSize = size;
-        if (input.placeholder is TMP_Text ph) { ph.text = placeholder; ph.fontSize = size; }
+        // Tamanho da letra vem do Update (FitInputText), pela altura real do campo.
+        if (input.placeholder is TMP_Text ph) ph.text = placeholder;
         return input;
+    }
+
+    // Letra a ~40% da altura do campo: cabe na área do texto (que tem margem interna) sem cortar.
+    private static void FitInputText(TMP_InputField input, float height)
+    {
+        float size = Mathf.Clamp(height * 0.4f, 12f, 40f);
+        input.pointSize = size;
+        if (input.placeholder is TMP_Text ph) ph.fontSize = size;
     }
 
     private static Button ButtonWithText(Transform parent, TMP_DefaultControls.Resources resources, string text,
@@ -180,7 +246,7 @@ public class LoginController : MonoBehaviour
             label.color = new Color(0.1f, 0.1f, 0.1f);
             label.enableAutoSizing = true;
             label.fontSizeMin = 14f;
-            label.fontSizeMax = 40f;
+            label.fontSizeMax = 28f;
             Stretch(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(8f, 4f));
         }
 
