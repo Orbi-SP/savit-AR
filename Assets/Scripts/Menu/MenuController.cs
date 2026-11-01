@@ -12,6 +12,8 @@ public class MenuController : MonoBehaviour
     {
         if (requireLogin && GetComponent<LoginController>() == null)
             gameObject.AddComponent<LoginController>();
+        if (GetComponent<RankingController>() == null)
+            gameObject.AddComponent<RankingController>();
     }
 
     public void StartGame()

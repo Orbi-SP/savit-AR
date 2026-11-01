@@ -42,6 +42,11 @@ public static class SavitApi
         yield return Send("GET", "/runs/ranking", null, true, done);
     }
 
+    public static IEnumerator GetUserRanking(string userId, Action<long, string> done)
+    {
+        yield return Send("GET", "/runs/user/" + Uri.EscapeDataString(userId), null, true, done);
+    }
+
     /// <summary>Envia sem esperar a resposta (ex.: ao sair da cena, quando não dá mais para rodar corrotina).</summary>
     public static void FireAndForget(string method, string path, string json, bool withToken)
     {
