@@ -5,9 +5,8 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Grava cada partida (run) do aluno logado no backend do SAVIT:
-/// - abre uma linha em runs quando a cena do jogo carrega;
-/// - a cada componente encaixado grava uma linha em scores ligada à run: 100 pontos, -10 por erro (mínimo 0);
-/// - fecha a run como "concluida" no fim do tutorial, ou "abandonada" se sair antes.
+/// - acumula uma pontuação por componente: 100 pontos, -10 por erro (mínimo 0);
+/// - envia a run e todas as pontuações para POST /runs no fim da partida.
 /// Erro = soltar a peça fora do lugar depois de segurá-la por pelo menos minHoldForError (AssemblyEvents).
 /// Criado sozinho na cena do jogo; o ranking é calculado pelo backend a partir das pontuações.
 /// </summary>
@@ -24,24 +23,34 @@ public class RunRecorder : MonoBehaviour
     public float minHoldForError = 0.5f;
 
 #pragma warning disable 0649 // preenchidos pelo JsonUtility
-    [Serializable] private class RunInsert { public string app_version; }
-    [Serializable] private class RunRow { public long id; }
-    [Serializable] private class RunRows { public RunRow[] items; }
-    [Serializable] private class RunResponse { public long id; public long runId; public RunRow run; public RunRow data; }
-    [Serializable] private class ScoreInsert { public long run_id; public string stage; public int points; public int errors; public float duration_seconds; }
-    [Serializable] private class RunFinish { public string status; public string finished_at; }
+    [Serializable] private class RunData
+    {
+        public string started_at;
+        public string finished_at;
+        public string status;
+        public int total_points;
+        public int total_errors;
+        public string app_version;
+    }
+
+    [Serializable] private class ScoreInsert { public string stage; public int points; public int errors; public float duration_seconds; }
+    [Serializable] private class CreateRunBody
+    {
+        public RunData runData;
+        public ScoreInsert[] scoresData;
+    }
 #pragma warning restore 0649
 
     private static bool hooked;
 
-    private long runId;              // 0 = run ainda não criada no banco
     private bool finished;
-    private string pendingFinish;    // status a gravar assim que a run existir
+    private bool submitted;
+    private DateTime startedAtUtc;
     private float stageStart;
     private TutorialManager tutorial;
     private readonly Dictionary<string, int> errors = new Dictionary<string, int>();
     private readonly HashSet<string> completed = new HashSet<string>();
-    private readonly List<ScoreInsert> pendingScores = new List<ScoreInsert>();
+    private readonly List<ScoreInsert> scores = new List<ScoreInsert>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Hook()
@@ -76,41 +85,8 @@ public class RunRecorder : MonoBehaviour
     private void Start()
     {
         tutorial = FindFirstObjectByType<TutorialManager>();
+        startedAtUtc = DateTime.UtcNow;
         stageStart = Time.time;
-
-        string body = JsonUtility.ToJson(new RunInsert { app_version = Application.version });
-        StartCoroutine(SavitApi.Send("POST", "/runs", body, true, (status, json) =>
-        {
-            RunRows rows = null;
-            RunResponse response = null;
-            if (SavitApi.IsSuccess(status))
-            {
-                try
-                {
-                    if ((json ?? "").TrimStart().StartsWith("["))
-                        rows = JsonUtility.FromJson<RunRows>("{\"items\":" + json + "}");
-                    else
-                        response = JsonUtility.FromJson<RunResponse>(json);
-                }
-                catch (Exception) { }
-            }
-            RunRow createdRun = rows?.items != null && rows.items.Length > 0
-                ? rows.items[0]
-                : response?.run ?? response?.data;
-            if (createdRun == null && response != null && response.id != 0)
-                createdRun = new RunRow { id = response.id };
-            if (createdRun == null && response != null && response.runId != 0)
-                createdRun = new RunRow { id = response.runId };
-            if (createdRun == null || createdRun.id == 0)
-            {
-                Debug.LogWarning("[RunRecorder] Não foi possível abrir a run; a pontuação desta partida não será salva.");
-                return;
-            }
-
-            runId = createdRun.id;
-            Debug.Log($"[RunRecorder] Run {runId} iniciada.");
-            Flush();
-        }));
     }
 
     private void Update()
@@ -120,14 +96,14 @@ public class RunRecorder : MonoBehaviour
 
         bool tutorialEnded = tutorial != null && !tutorial.IsRunning && tutorial.CurrentStepIndex >= tutorial.steps.Length;
         if (!finished && (tutorialEnded || completed.Count >= Stages.Length))
-            Finish("concluida");
+            Finish("finished");
     }
 
     private void OnDestroy()
     {
-        // Saiu antes de terminar: marca como abandonada (sem esperar resposta, a cena está fechando).
-        if (!finished && runId != 0)
-            SavitApi.FireAndForget("PATCH", $"/runs/{runId}", FinishBody("abandonada"), true);
+        // Saiu antes de terminar: envia a run parcial como abandonada.
+        if (!submitted)
+            SubmitRun("abandoned", true);
     }
 
     private void OnMissed(string stage, float heldSeconds)
@@ -150,40 +126,58 @@ public class RunRecorder : MonoBehaviour
             duration_seconds = Mathf.Round((Time.time - stageStart) * 100f) / 100f,
         };
         stageStart = Time.time;
-        pendingScores.Add(score);
+        scores.Add(score);
         Debug.Log($"[RunRecorder] Etapa '{stage}': {score.points} pontos ({e} erros, {score.duration_seconds}s).");
-        Flush();
     }
 
     private void Finish(string status)
     {
         finished = true;
-        pendingFinish = status;
-        Flush();
+        SubmitRun(status, false);
     }
 
-    // Envia o que estiver pendente assim que a run existir no banco.
-    private void Flush()
+    private void SubmitRun(string status, bool fireAndForget)
     {
-        if (runId == 0) return;
+        if (submitted) return;
+        submitted = true;
 
-        foreach (var score in pendingScores)
+        int totalPoints = 0;
+        int totalErrors = 0;
+        foreach (var score in scores)
         {
-            score.run_id = runId;
-            StartCoroutine(SavitApi.Send("POST", $"/runs/{runId}/scores", JsonUtility.ToJson(score), true, null));
+            totalPoints += score.points;
+            totalErrors += score.errors;
         }
-        pendingScores.Clear();
 
-        if (pendingFinish != null)
+        var body = new CreateRunBody
         {
-            StartCoroutine(SavitApi.Send("PATCH", $"/runs/{runId}", FinishBody(pendingFinish), true, null));
-            Debug.Log($"[RunRecorder] Run {runId} {pendingFinish}.");
-            pendingFinish = null;
+            runData = new RunData
+            {
+                started_at = startedAtUtc.ToString("o"),
+                finished_at = DateTime.UtcNow.ToString("o"),
+                status = status,
+                total_points = totalPoints,
+                total_errors = totalErrors,
+                app_version = Application.version,
+            },
+            scoresData = scores.ToArray(),
+        };
+        string json = JsonUtility.ToJson(body);
+
+        if (fireAndForget)
+        {
+            SavitApi.FireAndForget("POST", "/runs", json, true);
+            return;
         }
+
+        StartCoroutine(SavitApi.Send("POST", "/runs", json, true, (httpStatus, _) =>
+        {
+            if (SavitApi.IsSuccess(httpStatus))
+                Debug.Log($"[RunRecorder] Run {status} salva com {totalPoints} pontos e {totalErrors} erros.");
+            else
+                Debug.LogWarning("[RunRecorder] Não foi possível salvar a run e suas pontuações.");
+        }));
     }
 
     private int ErrorsOf(string stage) => errors.TryGetValue(stage, out int n) ? n : 0;
-
-    private static string FinishBody(string status) =>
-        JsonUtility.ToJson(new RunFinish { status = status, finished_at = DateTime.UtcNow.ToString("o") });
 }
