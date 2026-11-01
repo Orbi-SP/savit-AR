@@ -4,6 +4,7 @@ using System.Reflection;
 using SavitGame.AR;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
@@ -63,6 +64,8 @@ public class TutorialManager : MonoBehaviour
 	[Header("Layout")]
 	[Tooltip("Ajusta painéis e textos para tela deitada (âncoras proporcionais + auto-size). Desligue para usar o layout feito no Editor.")]
 	public bool autoLayout = true;
+	[Tooltip("Cena do menu carregada ao terminar a montagem.")]
+	public string menuSceneName = "MainMenu";
 
 	[Header("Etapas (na ordem)")]
 	public TutorialStep[] steps = DefaultSteps();
@@ -72,6 +75,8 @@ public class TutorialManager : MonoBehaviour
 
 	private Coroutine routine;
 	private bool okPressed;
+	private Button stopButton;
+	private GameObject completionOverlay;
 
 	private void Awake()
 	{
@@ -176,6 +181,8 @@ public class TutorialManager : MonoBehaviour
 	{
 		if (routine != null) StopCoroutine(routine);
 		routine = null;
+		if (stopButton != null) stopButton.gameObject.SetActive(false);
+		if (completionOverlay != null) completionOverlay.SetActive(false);
 		CurrentStepIndex = -1;
 		HideAll();
 	}
@@ -228,6 +235,7 @@ public class TutorialManager : MonoBehaviour
 		CurrentStepIndex = steps.Length;
 		HideAll();
 		routine = null;
+		ShowStopButton();
 	}
 
 	private void ShowExplanation(TutorialStep step)
@@ -263,6 +271,122 @@ public class TutorialManager : MonoBehaviour
 		TutorialGate.InputLocked = false;
 		if (explanationPanel != null) explanationPanel.SetActive(false);
 		ShowHint(null);
+	}
+
+	private void ShowCompletionOptions()
+	{
+		Canvas canvas = FindFirstObjectByType<Canvas>();
+		if (canvas == null)
+		{
+			Debug.LogError("[TutorialManager] Nenhum Canvas encontrado para mostrar as opções finais.");
+			return;
+		}
+
+		if (completionOverlay == null)
+			completionOverlay = BuildCompletionOverlay(canvas.transform);
+		completionOverlay.SetActive(true);
+		completionOverlay.transform.SetAsLastSibling();
+	}
+
+	private void ShowStopButton()
+	{
+		Canvas canvas = FindFirstObjectByType<Canvas>();
+		if (canvas == null)
+		{
+			Debug.LogError("[TutorialManager] Nenhum Canvas encontrado para mostrar o botão Parar.");
+			return;
+		}
+
+		if (stopButton == null)
+		{
+			var resources = new TMP_DefaultControls.Resources();
+			stopButton = CreateButton(canvas.transform, resources, "Parar",
+				new Vector2(0.78f, 0.88f), new Vector2(0.98f, 0.98f), OpenCompletionOptions);
+			stopButton.gameObject.name = "ButtonParar";
+		}
+
+		stopButton.gameObject.SetActive(true);
+		stopButton.transform.SetAsLastSibling();
+	}
+
+	private void OpenCompletionOptions()
+	{
+		if (stopButton != null) stopButton.gameObject.SetActive(false);
+		ShowCompletionOptions();
+	}
+
+	private void ReturnToMenu()
+	{
+		if (completionOverlay != null) completionOverlay.SetActive(false);
+		LoginController.ApplyMenuOrientation();
+		SceneManager.LoadScene(menuSceneName);
+	}
+
+	private static void QuitGame()
+	{
+		Application.Quit();
+	}
+
+	private static GameObject BuildCompletionOverlay(Transform parent)
+	{
+		var resources = new TMP_DefaultControls.Resources();
+		var overlay = CreatePanel("CompletionOverlay", parent, Vector2.zero, Vector2.one, new Color(0f, 0f, 0f, 0.88f));
+		var card = CreatePanel("CompletionCard", overlay.transform, new Vector2(0.20f, 0.22f), new Vector2(0.80f, 0.78f),
+			new Color(0.12f, 0.12f, 0.15f, 0.98f));
+		CreateLabel(card.transform, "Montagem concluída!", new Vector2(0.08f, 0.65f), new Vector2(0.92f, 0.88f),
+			24f, 56f, FontStyles.Bold);
+		CreateLabel(card.transform, "Escolha o que deseja fazer:", new Vector2(0.08f, 0.49f), new Vector2(0.92f, 0.65f),
+			16f, 34f, FontStyles.Normal);
+		CreateButton(card.transform, resources, "Voltar ao menu", new Vector2(0.12f, 0.30f), new Vector2(0.88f, 0.44f),
+			() => FindFirstObjectByType<TutorialManager>()?.ReturnToMenu());
+		CreateButton(card.transform, resources, "Sair do jogo", new Vector2(0.12f, 0.10f), new Vector2(0.88f, 0.24f), QuitGame);
+		overlay.SetActive(false);
+		return overlay;
+	}
+
+	private static GameObject CreatePanel(string name, Transform parent, Vector2 min, Vector2 max, Color color)
+	{
+		var panel = new GameObject(name, typeof(RectTransform), typeof(Image));
+		panel.transform.SetParent(parent, false);
+		Stretch(panel.GetComponent<RectTransform>(), min, max, Vector2.zero);
+		panel.GetComponent<Image>().color = color;
+		return panel;
+	}
+
+	private static TMP_Text CreateLabel(Transform parent, string text, Vector2 min, Vector2 max,
+		float minSize, float maxSize, FontStyles style)
+	{
+		var labelObject = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+		labelObject.transform.SetParent(parent, false);
+		Stretch(labelObject.GetComponent<RectTransform>(), min, max, Vector2.zero);
+		var label = labelObject.GetComponent<TextMeshProUGUI>();
+		label.text = text;
+		label.fontStyle = style;
+		label.color = Color.white;
+		label.alignment = TextAlignmentOptions.Center;
+		label.enableAutoSizing = true;
+		label.fontSizeMin = minSize;
+		label.fontSizeMax = maxSize;
+		label.raycastTarget = false;
+		return label;
+	}
+
+	private static Button CreateButton(Transform parent, TMP_DefaultControls.Resources resources, string text,
+		Vector2 min, Vector2 max, UnityEngine.Events.UnityAction onClick)
+	{
+		var buttonObject = TMP_DefaultControls.CreateButton(resources);
+		buttonObject.name = "Button" + text.Replace(" ", "");
+		buttonObject.transform.SetParent(parent, false);
+		Stretch(buttonObject.GetComponent<RectTransform>(), min, max, Vector2.zero);
+		var label = buttonObject.GetComponentInChildren<TMP_Text>(true);
+		label.text = text;
+		label.enableAutoSizing = true;
+		label.fontSizeMin = 16f;
+		label.fontSizeMax = 34f;
+		Stretch(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(8f, 4f));
+		var button = buttonObject.GetComponent<Button>();
+		button.onClick.AddListener(onClick);
+		return button;
 	}
 
 	/// <summary>
