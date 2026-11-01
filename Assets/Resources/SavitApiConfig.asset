@@ -13,4 +13,3 @@ MonoBehaviour:
   m_Name: SavitApiConfig
   m_EditorClassIdentifier: Assembly-CSharp::SavitApiConfig
   baseUrl: https://ihrws12500.execute-api.us-east-1.amazonaws.com/default
-  signupUrl:

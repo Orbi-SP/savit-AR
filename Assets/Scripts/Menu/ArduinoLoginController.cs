@@ -14,6 +14,7 @@ public class ArduinoLoginController : MonoBehaviour
             return;
         }
 
+        LoginController.ApplyGameOrientation();
         SceneManager.LoadScene(gameSceneName);
     }
 }

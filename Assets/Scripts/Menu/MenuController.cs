@@ -22,6 +22,7 @@ public class MenuController : MonoBehaviour
             return;
         }
 
+        LoginController.ApplyGameOrientation();
         SceneManager.LoadScene(gameSceneName);
     }
 

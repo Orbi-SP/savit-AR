@@ -7,8 +7,8 @@ using UnityEngine.UI;
 /// <summary>
 /// Tela de login do menu (e-mail + senha no backend do SAVIT). Montada por código por cima do Canvas do menu,
 /// sem mexer nos objetos da cena: enquanto ninguém entra, o "Iniciar Jogo" fica escondido.
-/// "Criar conta" abre o site do SAVIT (SavitApiConfig.signupUrl). Adicionada pelo MenuController.
-/// O login é em pé; depois de entrar a tela volta a ficar deitada, como o resto do menu e o jogo.
+/// "Criar conta" cria o usuário diretamente na API do SAVIT. Adicionada pelo MenuController.
+/// O menu permanece em pé; a orientação deitada é aplicada somente ao iniciar o jogo.
 /// </summary>
 public class LoginController : MonoBehaviour
 {
@@ -56,6 +56,8 @@ public class LoginController : MonoBehaviour
 
     private void Start()
     {
+        ApplyMenuOrientation();
+
         var canvas = FindFirstObjectByType<Canvas>();
         if (canvas == null)
         {
@@ -67,13 +69,12 @@ public class LoginController : MonoBehaviour
         BuildUi(canvas.transform);
         ShowLoggedIn(false);
 
-        // Sessão salva no aparelho: entra direto (continua deitado). Sem sessão, o login fica em pé.
+        // Sessão salva no aparelho: entra direto, mantendo o menu em pé.
         SetBusy(true, "Entrando...");
         StartCoroutine(SavitAuth.TryRestore(ok =>
         {
             SetBusy(false, ok ? null : "");
             ShowLoggedIn(ok);
-            ApplyOrientation(ok);
         }));
     }
 
@@ -84,16 +85,32 @@ public class LoginController : MonoBehaviour
         StartCoroutine(SavitAuth.SignIn(emailInput.text, passwordInput.text, OnAuthResult));
     }
 
-    /// <summary>Cadastro é feito no site do SAVIT.</summary>
-    public void OpenSignUpSite()
+    public void CreateAccount()
     {
-        var config = SavitApiConfig.Load();
-        if (config == null || string.IsNullOrWhiteSpace(config.signupUrl))
+        if (busy) return;
+
+        string email = emailInput.text.Trim();
+        string username = email;
+        int at = username.IndexOf('@');
+        if (at > 0) username = username.Substring(0, at);
+        if (string.IsNullOrEmpty(username))
         {
-            SetBusy(false, "Endereço do site de cadastro não configurado (SavitApiConfig > Signup Url).");
+            SetBusy(false, "Digite um e-mail para criar a conta.");
             return;
         }
-        Application.OpenURL(config.signupUrl);
+
+        SetBusy(true, "Criando conta...");
+        StartCoroutine(SavitAuth.CreateUser(username, email, passwordInput.text, (ok, error) =>
+        {
+            if (!ok)
+            {
+                SetBusy(false, error);
+                return;
+            }
+
+            SetBusy(true, "Conta criada. Entrando...");
+            StartCoroutine(SavitAuth.SignIn(email, passwordInput.text, OnAuthResult));
+        }));
     }
 
     public void SignOut()
@@ -103,7 +120,7 @@ public class LoginController : MonoBehaviour
         passwordInput.text = "";
         SetBusy(false, "");
         ShowLoggedIn(false);
-        ApplyOrientation(false);
+        ApplyMenuOrientation();
     }
 
     private void OnAuthResult(bool ok, string error)
@@ -111,26 +128,28 @@ public class LoginController : MonoBehaviour
         SetBusy(false, ok ? null : error);
         if (ok) passwordInput.text = "";
         ShowLoggedIn(ok);
-        if (ok) ApplyOrientation(true);
     }
 
     /// <summary>
     /// Login em pé; logado, volta ao padrão do projeto (Player Settings): rotação automática só em paisagem.
     /// No Editor não tem efeito (a Game view mantém a resolução escolhida).
     /// </summary>
-    private static void ApplyOrientation(bool loggedIn)
+    public static void ApplyMenuOrientation()
     {
-        if (!loggedIn)
-        {
-            Screen.orientation = ScreenOrientation.Portrait;
-            return;
-        }
+        Screen.autorotateToPortrait = true;
+        Screen.autorotateToPortraitUpsideDown = false;
+        Screen.autorotateToLandscapeLeft = false;
+        Screen.autorotateToLandscapeRight = false;
+        Screen.orientation = ScreenOrientation.Portrait;
+    }
 
+    public static void ApplyGameOrientation()
+    {
         Screen.autorotateToPortrait = false;
         Screen.autorotateToPortraitUpsideDown = false;
         Screen.autorotateToLandscapeLeft = true;
         Screen.autorotateToLandscapeRight = true;
-        Screen.orientation = ScreenOrientation.AutoRotation;
+        Screen.orientation = ScreenOrientation.LandscapeLeft;
     }
 
     private void ShowLoggedIn(bool loggedIn)
@@ -179,7 +198,7 @@ public class LoginController : MonoBehaviour
 
         signInButton = ButtonWithText(card.transform, resources, "Entrar", new Vector2(0.08f, 0.19f), new Vector2(0.48f, 0.31f), SignIn);
         Portrait(signInButton, new Vector2(0.08f, 0.37f), new Vector2(0.92f, 0.44f));
-        var signUpButton = ButtonWithText(card.transform, resources, "Criar conta", new Vector2(0.52f, 0.19f), new Vector2(0.92f, 0.31f), OpenSignUpSite);
+        var signUpButton = ButtonWithText(card.transform, resources, "Criar conta", new Vector2(0.52f, 0.19f), new Vector2(0.92f, 0.31f), CreateAccount);
         Portrait(signUpButton, new Vector2(0.08f, 0.28f), new Vector2(0.92f, 0.35f));
         var quitButton = ButtonWithText(card.transform, resources, "Sair do jogo", new Vector2(0.32f, 0.05f), new Vector2(0.68f, 0.14f), Application.Quit);
         Portrait(quitButton, new Vector2(0.25f, 0.17f), new Vector2(0.75f, 0.23f));
