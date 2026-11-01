@@ -121,3 +121,18 @@ Se quiser mostrar uma tela de "Aguardando Login":
 - [ ] Testado com curl (Login funciona)
 
 Pronto! Agora quando clicar em Jogar, o Unity vai aguardar a requisição da sua API Python! 🚀
+
+## Configurar a API do SAVIT (Unity 6000.2.6f2)
+
+O projeto já contém o asset `Assets/Resources/SavitApiConfig.asset`. No Unity 6000.2.6f2:
+
+1. Abra `Assets/Resources/SavitApiConfig.asset` no Inspector.
+2. Em **Base Url**, mantenha `https://ihrws12500.execute-api.us-east-1.amazonaws.com/default`.
+3. O botão **Criar conta** usa diretamente `POST /user`; não é necessário configurar ou abrir um site externo.
+4. Não crie outro asset com o mesmo nome em `Resources`; os scripts carregam este asset automaticamente.
+5. Salve a cena e execute o menu. O menu fica em retrato; o botão **Jogar** força paisagem antes de carregar a cena `BRP Sample SceneGabinete`.
+6. O login usa `POST /auth`; o cadastro usa `POST /user` e entra automaticamente após a criação.
+7. Ao terminar ou abandonar a cena `BRP Sample SceneGabinete`, o app envia uma requisição autenticada `POST /runs` com `runData` (incluindo `user_id`) e `scoresData`. Cada item de `scoresData` contém somente `points` e `stage`; ele representa um componente com 100 pontos, menos 10 por erro.
+8. O ranking é lido autenticado por `GET /runs/ranking`; ele deve ser calculado pelo backend com as runs e pontuações salvas.
+
+O app envia o token retornado pelo login no cabeçalho `Authorization: Bearer <token>`. Não coloque chaves privadas ou credenciais do banco no projeto Unity.

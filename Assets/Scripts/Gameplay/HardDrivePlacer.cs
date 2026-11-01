@@ -1,0 +1,460 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Events;
+
+public class HardDrivePlacer : MonoBehaviour
+{
+	[Header("Referências")]
+	public Api api;
+	public BoxCollider snapZone;
+	public Transform snapAnchor;
+	public PowerSupplyPlacer powerSupplyPlacer;
+	[Tooltip("Cabo ATX 24 pinos: o HD só é liberado depois que ele estiver conectado.")]
+	public PowerCableConnector powerCable;
+	[Tooltip("Objeto vazio na placa-mãe onde o cabo SATA é ligado (SATAPort_Placa).")]
+	public Transform sataPortPlaca;
+
+	[Header("Movimento")]
+	public bool useAxisX = true;
+	public float moveSpeed = 1.0f;
+	[Tooltip("Deslocamento vertical local aplicado enquanto o HD está sendo segurado.")]
+	public float liftY = 3.0f;
+	public Vector2 moveLimits = new Vector2(-10f, 10f);
+
+	[Header("Snap")]
+	public float snapTolerance = 0.05f;
+
+	[Header("Animação - Colocar na baia")]
+	[Tooltip("De onde o HD começa a deslizar para dentro da baia (em tamanhos do HD).")]
+	public float entryOffset = 0.8f;
+	[Tooltip("Entra por cima (up da cena): no AR o gabinete fica deitado e aberto para cima. Desligado = forward do SnapAnchor.")]
+	public bool entryFromAbove = true;
+	public float approachDuration = 0.3f;
+	public float slideDuration = 0.6f;
+
+	[Header("Animação - Parafusos")]
+	[Tooltip("Quanto cada parafuso começa afastado da lateral (em relação à meia-largura do HD).")]
+	public float screwOutDistance = 0.3f;
+	public float screwTurns = 3f;
+	public float screwDuration = 0.4f;
+
+	[Header("Cabo SATA")]
+	public Material cableMaterial;
+	public Color cableColor = new Color(0.75f, 0.1f, 0.1f);
+	public float cableDuration = 0.8f;
+	[Tooltip("Espessura do cabo em relação ao tamanho do HD.")]
+	public float cableWidth = 0.04f;
+	[Tooltip("Folga do cabo para cima (em relação à distância HD–placa): ele sobe do HD, passa por cima das gavetas e desce na porta.")]
+	public float cableSag = 0.15f;
+	public int cableSegments = 16;
+	[Tooltip("Liga o SATA ao lado do conector de 24 pinos em vez da SATAPort_Placa. Sem SATAPort_Placa, esse é sempre o caminho.")]
+	public bool sataNextToAtx24 = false;
+	[Tooltip("Distância da porta SATA até o conector de 24 pinos, para dentro da placa-mãe (em tamanhos do HD).")]
+	public float sataOffsetFromAtx24 = 0.25f;
+
+	[Header("Eventos")]
+	public UnityEvent onInstalled;
+
+	public bool IsSnapped => isSnapped;
+	public bool IsInstalled { get; private set; }
+
+	private Vector3 originalLocalPos;
+	private Quaternion originalLocalRot;
+	private float accum;
+	private bool prevHolding;
+	private bool isSnapped;
+	private float grabHandX;
+	private float grabAccum;
+	private float grabTime;
+
+	private readonly List<Transform> screws = new List<Transform>();
+	private Transform sataConnector;
+	private LineRenderer cable;
+	private Transform sataPlug;
+	private Vector3 sataEndLocal; // fim do cabo no espaço do pai do HD (a cena AR pode ser reancorada)
+	private float cableProgress;
+	private float hdSize;
+
+	private void ResolveRefsIfNeeded()
+	{
+		var root = transform.root;
+
+		if (api == null && root != null) api = root.GetComponentInChildren<Api>(true);
+		if (api == null) api = FindFirstObjectByType<Api>();
+
+		if (powerSupplyPlacer == null && root != null)
+			powerSupplyPlacer = root.GetComponentInChildren<PowerSupplyPlacer>(true);
+		if (powerSupplyPlacer == null)
+			powerSupplyPlacer = FindFirstObjectByType<PowerSupplyPlacer>();
+
+		if (powerCable == null && root != null)
+			powerCable = root.GetComponentInChildren<PowerCableConnector>(true);
+		if (powerCable == null)
+			powerCable = FindFirstObjectByType<PowerCableConnector>();
+	}
+
+	private void Start()
+	{
+		originalLocalPos = transform.localPosition;
+		originalLocalRot = transform.localRotation;
+		ResolveRefsIfNeeded();
+
+		var rb = GetComponent<Rigidbody>();
+		if (rb != null)
+		{
+			rb.isKinematic = true;
+			rb.useGravity = false;
+		}
+
+		// Parafusos e conector vêm do HardDrive.fbx (Tools/gerar_hd_fbx.py).
+		foreach (var t in GetComponentsInChildren<Transform>(true))
+		{
+			if (t.name.StartsWith("Screw_", System.StringComparison.OrdinalIgnoreCase)) screws.Add(t);
+			else if (t.name.Equals("HD_SATA_Data", System.StringComparison.OrdinalIgnoreCase)) sataConnector = t;
+		}
+		screws.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+
+		// Os parafusos só aparecem quando o HD é parafusado no gabinete.
+		foreach (var screw in screws) SetRenderersEnabled(screw, false);
+
+		Debug.Log($"[HardDrivePlacer] Start: api={(api != null ? "OK" : "NULL")} " +
+				  $"fonte={(powerSupplyPlacer != null ? "OK" : "NULL")} caboATX={(powerCable != null ? "OK" : "NULL")} " +
+				  $"parafusos={screws.Count} " +
+				  $"sataPlaca={(sataPortPlaca != null ? "OK" : "NULL")}");
+	}
+
+	private void Update()
+	{
+		if (isSnapped) return;
+
+		ResolveRefsIfNeeded();
+		if (api == null || api.currentScene != Api.SceneType.Gabinete) return;
+		if (powerSupplyPlacer == null || !powerSupplyPlacer.IsSnapped) return;
+		// Mesmo gesto do conector ATX: só libera o HD depois do cabo ligado na placa-mãe.
+		if (powerCable != null && !powerCable.IsConnected) return;
+		// Explicação do tutorial aberta: não deixa pegar a peça.
+		if (TutorialGate.InputLocked) { prevHolding = false; return; }
+
+		bool holding = api.IsHolding;
+
+		if (holding && !prevHolding)
+		{
+			grabHandX = api.HandPositionX;
+			grabAccum = accum;
+			grabTime = Time.time;
+		}
+
+		if (holding)
+		{
+			float movementRange = (moveLimits.y - moveLimits.x) * moveSpeed;
+			float targetAccum = grabAccum + (api.HandPositionX - grabHandX) * movementRange;
+			accum = Mathf.Lerp(accum, targetAccum, Time.deltaTime * 10f);
+		}
+		else
+		{
+			accum = Mathf.Lerp(accum, 0f, Time.deltaTime * 5f);
+		}
+
+		accum = Mathf.Clamp(accum, moveLimits.x, moveLimits.y);
+
+		Vector3 targetLocal = originalLocalPos;
+		if (useAxisX) targetLocal.x = originalLocalPos.x + accum;
+		else targetLocal.z = originalLocalPos.z + accum;
+		targetLocal.y = holding ? originalLocalPos.y + liftY : originalLocalPos.y;
+
+		transform.localPosition = Vector3.Lerp(transform.localPosition, targetLocal, Time.deltaTime * 5f);
+		transform.localRotation = originalLocalRot;
+
+		if (prevHolding && !holding && IsAlignedXZ(transform.position))
+		{
+			prevHolding = holding;
+			BeginInstall();
+			return;
+		}
+
+		// Soltou fora da gaveta: conta como erro na pontuação.
+		if (prevHolding && !holding) AssemblyEvents.Miss(AssemblyEvents.HardDrive, Time.time - grabTime);
+		prevHolding = holding;
+	}
+
+	private void LateUpdate()
+	{
+		// Atualiza todo frame: a cena AR pode ser reancorada depois da instalação.
+		if (cable != null) UpdateCable();
+	}
+
+	private bool IsAlignedXZ(Vector3 worldPos)
+	{
+		if (snapZone == null) return false;
+
+		Vector3 local = snapZone.transform.InverseTransformPoint(worldPos);
+		Vector3 half = snapZone.size * 0.5f;
+
+		return Mathf.Abs(local.x) <= half.x + snapTolerance &&
+			   Mathf.Abs(local.z) <= half.z + snapTolerance;
+	}
+
+	private void BeginInstall()
+	{
+		if (snapAnchor == null)
+		{
+			Debug.LogWarning("[HardDrivePlacer] SnapAnchor nao esta atribuido.");
+			return;
+		}
+
+		isSnapped = true;
+		hdSize = GetSize();
+		StartCoroutine(InstallSequence());
+	}
+
+	private IEnumerator InstallSequence()
+	{
+		// 1) Colocar: o HD vai até a frente da baia e desliza para dentro.
+		// "Cima" da cena, não do anchor: com o HD de lado na gaveta, o up do anchor fica na horizontal.
+		Vector3 sceneUp = transform.parent != null ? transform.parent.up : Vector3.up;
+		Vector3 entryDir = entryFromAbove ? sceneUp : snapAnchor.forward;
+		Vector3 bayEntry = snapAnchor.position + entryDir * (hdSize * entryOffset);
+		yield return MoveTo(bayEntry, snapAnchor.rotation, approachDuration);
+		yield return MoveTo(snapAnchor.position, snapAnchor.rotation, slideDuration);
+		Debug.Log("[HardDrivePlacer] HD colocado na baia.");
+
+		// 2) Parafusar: um parafuso por vez, entrando e girando.
+		foreach (var screw in screws)
+			yield return ScrewIn(screw);
+		Debug.Log("[HardDrivePlacer] HD parafusado no gabinete.");
+
+		// 3) Ligar na placa-mãe: o cabo SATA sai do HD e encaixa na placa, ao lado do 24 pinos.
+		if (ResolveSataEnd())
+			yield return ConnectCable();
+		else
+			Debug.LogWarning("[HardDrivePlacer] Sem cabo ATX nem SATAPort_Placa; cabo SATA nao sera desenhado.");
+
+		IsInstalled = true;
+		Debug.Log("✅ HD instalado (colocado, parafusado e ligado na placa-mãe).");
+		onInstalled?.Invoke();
+		AssemblyEvents.Complete(AssemblyEvents.HardDrive);
+	}
+
+	private IEnumerator MoveTo(Vector3 targetPos, Quaternion targetRot, float duration)
+	{
+		Vector3 fromPos = transform.position;
+		Quaternion fromRot = transform.rotation;
+
+		for (float t = 0f; t < duration; t += Time.deltaTime)
+		{
+			float k = Mathf.SmoothStep(0f, 1f, t / duration);
+			transform.SetPositionAndRotation(Vector3.Lerp(fromPos, targetPos, k), Quaternion.Slerp(fromRot, targetRot, k));
+			yield return null;
+		}
+
+		transform.SetPositionAndRotation(targetPos, targetRot);
+	}
+
+	private IEnumerator ScrewIn(Transform screw)
+	{
+		SetRenderersEnabled(screw, true);
+
+		Vector3 seatedPos = screw.position;
+		Quaternion seatedRot = screw.rotation;
+
+		// O parafuso entra pela lateral, no eixo X do HD, vindo do lado de fora.
+		Vector3 local = transform.InverseTransformPoint(GetCenter(screw));
+		Vector3 outward = transform.TransformVector(new Vector3(local.x * screwOutDistance, 0f, 0f));
+		Vector3 axis = transform.right;
+
+		for (float t = 0f; t < screwDuration; t += Time.deltaTime)
+		{
+			float k = t / screwDuration;
+			screw.SetPositionAndRotation(
+				seatedPos + outward * (1f - k),
+				Quaternion.AngleAxis(screwTurns * 360f * k, axis) * seatedRot);
+			yield return null;
+		}
+
+		screw.SetPositionAndRotation(seatedPos, seatedRot);
+	}
+
+	/// <summary>
+	/// Onde o cabo SATA termina. Preferência: SATAPort_Placa (filha da placa-mãe, nas portas SATA da borda).
+	/// Sem ela (ou com sataNextToAtx24), ao lado do conector de 24 pinos já ligado, para dentro da placa.
+	/// </summary>
+	private bool ResolveSataEnd()
+	{
+		Vector3 endWorld;
+		bool useAtx = sataNextToAtx24 || sataPortPlaca == null;
+		Transform atx = useAtx && powerCable != null && powerCable.IsConnected ? powerCable.mbConnector : null;
+		if (atx != null)
+		{
+			Vector3 inward = Vector3.zero;
+			var board = FindBoard();
+			if (board != null && TryGetRendererBounds(board, out Bounds bb)) inward = bb.center - atx.position;
+			inward = Vector3.ProjectOnPlane(inward, transform.up);
+			if (inward.sqrMagnitude < 1e-8f) inward = Vector3.ProjectOnPlane(atx.position - transform.position, transform.up);
+			endWorld = atx.position + inward.normalized * (hdSize * sataOffsetFromAtx24);
+		}
+		else if (sataPortPlaca != null)
+		{
+			endWorld = sataPortPlaca.position;
+		}
+		else
+		{
+			return false;
+		}
+
+		sataEndLocal = transform.parent != null ? transform.parent.InverseTransformPoint(endWorld) : endWorld;
+		return true;
+	}
+
+	private Vector3 SataEnd => transform.parent != null ? transform.parent.TransformPoint(sataEndLocal) : sataEndLocal;
+
+	private Transform FindBoard()
+	{
+		var root = transform.parent != null ? transform.parent : transform.root;
+		var placer = root.GetComponentInChildren<MotherboardPlacer>(true);
+		return placer != null ? placer.transform : null;
+	}
+
+	private IEnumerator ConnectCable()
+	{
+		cable = CreateCable();
+
+		for (float t = 0f; t < cableDuration; t += Time.deltaTime)
+		{
+			cableProgress = t / cableDuration;
+			yield return null;
+		}
+
+		cableProgress = 1f;
+		CreatePlug();
+		Debug.Log("[HardDrivePlacer] Cabo SATA ligado na placa-mãe.");
+	}
+
+	private LineRenderer CreateCable()
+	{
+		var go = new GameObject("SATA_Cable");
+		go.transform.SetParent(transform, false);
+
+		var line = go.AddComponent<LineRenderer>();
+		line.useWorldSpace = true;
+		line.positionCount = 0;
+		line.numCapVertices = 4;
+		line.numCornerVertices = 2;
+		line.widthMultiplier = hdSize * cableWidth;
+		line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+		line.startColor = cableColor;
+		line.endColor = cableColor;
+
+		if (cableMaterial != null)
+		{
+			line.material = cableMaterial;
+		}
+		else
+		{
+			var shader = Shader.Find("Sprites/Default");
+			if (shader != null) line.material = new Material(shader);
+		}
+
+		return line;
+	}
+
+	private void UpdateCable()
+	{
+		Vector3 start = sataConnector != null ? GetCenter(sataConnector) : transform.position;
+		Vector3 end = SataEnd;
+		CableControls(start, end, out Vector3 c1, out Vector3 c2);
+
+		int segments = Mathf.Max(2, cableSegments);
+		cable.positionCount = segments + 1;
+		for (int i = 0; i <= segments; i++)
+		{
+			float s = cableProgress * i / segments;
+			float u = 1f - s;
+			cable.SetPosition(i, u * u * u * start + 3f * u * u * s * c1 + 3f * u * s * s * c2 + s * s * s * end);
+		}
+
+		if (sataPlug != null) sataPlug.position = end;
+	}
+
+	// Bézier cúbica: sobe do HD, segue na altura das gavetas e desce na porta. Com uma curva simples
+	// o cabo atravessava a tampa da gaiola de discos (o gabinete fica deitado e é visto de cima no AR).
+	private void CableControls(Vector3 start, Vector3 end, out Vector3 c1, out Vector3 c2)
+	{
+		Vector3 up = transform.parent != null ? transform.parent.up : Vector3.up;
+		float lift = Vector3.Distance(start, end) * cableSag;
+		float rise = Mathf.Max(0f, Vector3.Dot(start - end, up));
+		c1 = start + up * lift;
+		c2 = end + up * (rise + lift);
+	}
+
+	private void CreatePlug()
+	{
+		var plug = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		plug.name = "SATA_Plug";
+		Destroy(plug.GetComponent<Collider>());
+
+		// Conector na ponta do cabo, apontando para a placa (mesma direção em que o cabo chega).
+		Vector3 start = sataConnector != null ? GetCenter(sataConnector) : transform.position;
+		Vector3 end = SataEnd;
+		CableControls(start, end, out _, out Vector3 c2);
+		Vector3 arrive = end - c2;
+		Quaternion rot = arrive.sqrMagnitude > 1e-8f ? Quaternion.LookRotation(arrive, transform.up) : transform.rotation;
+
+		float size = hdSize * cableWidth;
+		plug.transform.SetParent(cable.transform, false);
+		plug.transform.SetPositionAndRotation(end, rot);
+		plug.transform.localScale = Vector3.one;
+		plug.transform.localScale = DivideByLossy(plug.transform, new Vector3(size * 2.2f, size * 1.2f, size * 2.8f));
+		sataPlug = plug.transform;
+
+		var rend = plug.GetComponent<Renderer>();
+		if (rend != null) rend.material.color = Color.black;
+	}
+
+	private static Vector3 DivideByLossy(Transform t, Vector3 worldSize)
+	{
+		Vector3 parentScale = t.parent != null ? t.parent.lossyScale : Vector3.one;
+		return new Vector3(
+			worldSize.x / Mathf.Max(Mathf.Abs(parentScale.x), 1e-6f),
+			worldSize.y / Mathf.Max(Mathf.Abs(parentScale.y), 1e-6f),
+			worldSize.z / Mathf.Max(Mathf.Abs(parentScale.z), 1e-6f));
+	}
+
+	private static bool TryGetRendererBounds(Transform t, out Bounds bounds)
+	{
+		bounds = default;
+		bool any = false;
+		foreach (var r in t.GetComponentsInChildren<Renderer>())
+		{
+			if (!r.enabled) continue;
+			if (!any) { bounds = r.bounds; any = true; }
+			else bounds.Encapsulate(r.bounds);
+		}
+		return any;
+	}
+
+	private float GetSize()
+	{
+		bool any = false;
+		Bounds b = new Bounds(transform.position, Vector3.zero);
+		foreach (var r in GetComponentsInChildren<Renderer>())
+		{
+			if (!r.enabled) continue;
+			if (!any) { b = r.bounds; any = true; }
+			else b.Encapsulate(r.bounds);
+		}
+		return any ? Mathf.Max(b.size.x, b.size.y, b.size.z) : 0.1f;
+	}
+
+	private static Vector3 GetCenter(Transform t)
+	{
+		var r = t.GetComponentInChildren<Renderer>();
+		return r != null && r.enabled ? r.bounds.center : t.position;
+	}
+
+	private static void SetRenderersEnabled(Transform t, bool enabled)
+	{
+		foreach (var r in t.GetComponentsInChildren<Renderer>(true))
+			r.enabled = enabled;
+	}
+}

@@ -25,6 +25,7 @@ public class PowerSupplyPlacer : MonoBehaviour
 	private bool isSnapped;
 	private float grabHandX;
 	private float grabAccum;
+	private float grabTime;
 
 	public bool IsSnapped => isSnapped;
 
@@ -65,6 +66,8 @@ public class PowerSupplyPlacer : MonoBehaviour
 		ResolveRefsIfNeeded();
 		if (api == null || api.currentScene != Api.SceneType.Gabinete) return;
 		if (motherboardPlacer == null || !motherboardPlacer.IsSnapped) return;
+		// Explicação do tutorial aberta: não deixa pegar a peça.
+		if (TutorialGate.InputLocked) { prevHolding = false; return; }
 
 		bool holding = api.IsHolding;
 
@@ -72,6 +75,7 @@ public class PowerSupplyPlacer : MonoBehaviour
 		{
 			grabHandX = api.HandPositionX;
 			grabAccum = accum;
+			grabTime = Time.time;
 		}
 
 		if (holding)
@@ -101,6 +105,8 @@ public class PowerSupplyPlacer : MonoBehaviour
 			return;
 		}
 
+		// Soltou fora do lugar: conta como erro na pontuação.
+		if (prevHolding && !holding) AssemblyEvents.Miss(AssemblyEvents.PowerSupply, Time.time - grabTime);
 		prevHolding = holding;
 	}
 
@@ -134,5 +140,6 @@ public class PowerSupplyPlacer : MonoBehaviour
 		}
 
 		Debug.Log("Power supply encaixada (Snap aplicado).");
+		AssemblyEvents.Complete(AssemblyEvents.PowerSupply);
 	}
 }

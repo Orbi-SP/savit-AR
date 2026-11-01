@@ -7,6 +7,14 @@ public class ArduinoLoginController : MonoBehaviour
 
     public void StartGame()
     {
+        // Mesmo caminho do menu: sem login não entra no jogo.
+        if (!AuthSession.IsLoggedIn)
+        {
+            Debug.LogWarning("[ArduinoLoginController] Faça login antes de iniciar o jogo.");
+            return;
+        }
+
+        LoginController.ApplyGameOrientation();
         SceneManager.LoadScene(gameSceneName);
     }
 }

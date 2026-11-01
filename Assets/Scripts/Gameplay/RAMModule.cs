@@ -21,9 +21,11 @@ public class RAMModule : MonoBehaviour, IReleasable
     private float accum;
     private bool prevHolding;
     private bool isSnapped;
+    public bool IsSnapped => isSnapped;
 
     private float grabHandX;
     private float grabAccum;
+    private float grabTime;
     [Header("Snap")]
     public float maxSnapDistance = 0.2f; // ajuste conforme necessário
 
@@ -62,6 +64,8 @@ public class RAMModule : MonoBehaviour, IReleasable
         if (api == null) return;
         if (api.currentScene != Api.SceneType.RAM) return;
         if (isSnapped) return;
+        // Explicação do tutorial aberta: não deixa pegar a peça.
+        if (TutorialGate.InputLocked) { prevHolding = false; return; }
 
         bool holding = api.IsHolding;
 
@@ -70,6 +74,7 @@ public class RAMModule : MonoBehaviour, IReleasable
         {
             grabHandX = api.HandPositionX;
             grabAccum = accum;
+            grabTime = Time.time;
         }
 
         if (holding)
@@ -109,10 +114,10 @@ public class RAMModule : MonoBehaviour, IReleasable
             transform.localRotation = Quaternion.Lerp(transform.localRotation, originalLocalRot, Time.deltaTime * 5f);
         }
 
-        // Snap ao soltar
+        // Snap ao soltar (soltar fora do slot conta como erro na pontuação)
         if (prevHolding && !holding)
         {
-            TrySnapToNearestSlot();
+            if (!TrySnapToNearestSlot()) AssemblyEvents.Miss(AssemblyEvents.Ram, Time.time - grabTime);
         }
 
         prevHolding = holding;
@@ -124,10 +129,11 @@ public class RAMModule : MonoBehaviour, IReleasable
         TrySnapToNearestSlot();
     }
 
-    void TrySnapToNearestSlot()
+    /// <summary>Encaixa no slot mais próximo; false = ficou fora do slot.</summary>
+    bool TrySnapToNearestSlot()
     {
-        if (isSnapped) return;
-        if (slots == null || slots.Length == 0) return;
+        if (isSnapped) return true;
+        if (slots == null || slots.Length == 0) return false;
 
         RAMSlot best = null;
         float bestDist = float.MaxValue;
@@ -199,11 +205,12 @@ public class RAMModule : MonoBehaviour, IReleasable
                 Debug.Log("🔄 Cena trocada para Gabinete automaticamente.");
             }
 
+            AssemblyEvents.Complete(AssemblyEvents.Ram);
+            return true;
         }
-        else
-        {
-            Debug.Log("❌ RAM fora do slot / distante para snap.");
-        }
+
+        Debug.Log("❌ RAM fora do slot / distante para snap.");
+        return false;
     }
 
 }

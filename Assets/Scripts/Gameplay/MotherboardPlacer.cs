@@ -36,6 +36,7 @@ public class MotherboardPlacer : MonoBehaviour
 
     private float grabHandX;
     private float grabAccum;
+    private float grabTime;
 
     private void ResolveRefsIfNeeded()
     {
@@ -97,6 +98,8 @@ public class MotherboardPlacer : MonoBehaviour
         ResolveRefsIfNeeded();
         if (api == null) return;
         if (api.currentScene != Api.SceneType.Gabinete) return;
+        // Explicação do tutorial aberta: não deixa pegar a peça.
+        if (TutorialGate.InputLocked) { prevHolding = false; return; }
 
         // Antes da RAM estar instalada, a placa-mãe não deve sequer “levantar/mover”.
         bool requirementsOk = motherboardState == null || motherboardState.HasRequiredMemory;
@@ -108,6 +111,7 @@ public class MotherboardPlacer : MonoBehaviour
         {
             grabHandX = api.HandPositionX;
             grabAccum = accum;
+            grabTime = Time.time;
         }
 
         // Movimento RELATIVO (sem pulo): a placa acompanha a variação da mão a partir do ponto de pega.
@@ -144,6 +148,8 @@ public class MotherboardPlacer : MonoBehaviour
             DoSnap();
             return;
         }
+        // Soltou fora do gabinete: conta como erro na pontuação.
+        if (prevHolding && !holding) AssemblyEvents.Miss(AssemblyEvents.Motherboard, Time.time - grabTime);
         prevHolding = holding;
     }
 
@@ -180,6 +186,7 @@ public class MotherboardPlacer : MonoBehaviour
 
         isSnapped = true;
         Debug.Log("✅ Motherboard encaixada (Snap aplicado).");
+        AssemblyEvents.Complete(AssemblyEvents.Motherboard);
         
         // Trocar câmeras após 3 segundos
         Debug.Log("Aguardando 3 segundos antes de trocar câmeras...");

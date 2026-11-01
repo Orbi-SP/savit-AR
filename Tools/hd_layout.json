@@ -1,0 +1,14 @@
+{
+    "_comentario": "Layout do HD calculado a partir de Library/SavitDiag/geometry.json (SAVIT > Exportar geometria do gabinete). Coordenadas no espaço da raiz do GameScenePrefab; aplicar com SAVIT > Aplicar layout do HD. HD de lado na fenda entre a 2a e a 3a gaveta de 3,5\" (z -12.37 a -12.04), borda de cima rente aos puxadores; SATA na porta de cima da pilha SATA da placa (borda direita).",
+    "hdStartPos": { "x": -73.017, "y": 4.1515, "z": -12.3225 },
+    "hdStartEuler": { "x": 0, "y": 0, "z": 0 },
+    "hdScale": 9.0,
+    "bayPos": { "x": -64.92, "y": 5.3285, "z": -12.3225 },
+    "bayEuler": { "x": 90, "y": 0, "z": 0 },
+    "zoneSize": { "x": 1.6, "y": 2.0, "z": 1.0 },
+    "sataLocalInBoard": { "x": 2.19552, "y": 0.35983, "z": -0.1234 },
+    "moveLimits": { "x": -1.6194, "y": 10.5261 },
+    "moveSpeed": 1.33333,
+    "liftY": 2.2045,
+    "cableSag": 0.15
+}
