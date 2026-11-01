@@ -12,6 +12,8 @@ using UnityEngine.UI;
 /// </summary>
 public class LoginController : MonoBehaviour
 {
+    private const string CreateAccountUrl = "https://orbi-sp.github.io/landing-page/createAccount.html";
+
     [Tooltip("Botão do menu que só aparece depois do login.")]
     public string startButtonName = "ButtonStart";
 
@@ -88,29 +90,7 @@ public class LoginController : MonoBehaviour
     public void CreateAccount()
     {
         if (busy) return;
-
-        string email = emailInput.text.Trim();
-        string username = email;
-        int at = username.IndexOf('@');
-        if (at > 0) username = username.Substring(0, at);
-        if (string.IsNullOrEmpty(username))
-        {
-            SetBusy(false, "Digite um e-mail para criar a conta.");
-            return;
-        }
-
-        SetBusy(true, "Criando conta...");
-        StartCoroutine(SavitAuth.CreateUser(username, email, passwordInput.text, (ok, error) =>
-        {
-            if (!ok)
-            {
-                SetBusy(false, error);
-                return;
-            }
-
-            SetBusy(true, "Conta criada. Entrando...");
-            StartCoroutine(SavitAuth.SignIn(email, passwordInput.text, OnAuthResult));
-        }));
+        Application.OpenURL(CreateAccountUrl);
     }
 
     public void SignOut()
