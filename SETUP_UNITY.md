@@ -128,10 +128,11 @@ O projeto já contém o asset `Assets/Resources/SavitApiConfig.asset`. No Unity 
 
 1. Abra `Assets/Resources/SavitApiConfig.asset` no Inspector.
 2. Em **Base Url**, mantenha `https://ihrws12500.execute-api.us-east-1.amazonaws.com/default`.
-3. Preencha **Signup Url** somente se o botão **Criar conta** deverá abrir uma página web de cadastro.
+3. O botão **Criar conta** usa diretamente `POST /user`; não é necessário configurar ou abrir um site externo.
 4. Não crie outro asset com o mesmo nome em `Resources`; os scripts carregam este asset automaticamente.
-5. Salve a cena e execute o menu. O login usa `POST /auth`; o cadastro, quando chamado pelo serviço, usa `POST /user`.
-6. Ao entrar na cena `BRP Sample SceneGabinete`, uma run é aberta em `POST /runs`. Cada etapa concluída é enviada autenticada para `/runs/{runId}/scores`, e o encerramento usa `PATCH /runs/{runId}`.
-7. O ranking é lido autenticado por `GET /runs/ranking`; ele deve ser calculado pelo backend com as runs e pontuações salvas.
+5. Salve a cena e execute o menu. O menu fica em retrato; o botão **Jogar** força paisagem antes de carregar a cena `BRP Sample SceneGabinete`.
+6. O login usa `POST /auth`; o cadastro usa `POST /user` e entra automaticamente após a criação.
+7. Ao entrar na cena `BRP Sample SceneGabinete`, uma run é aberta em `POST /runs`. Cada etapa concluída é enviada autenticada para `/runs/{runId}/scores`, e o encerramento usa `PATCH /runs/{runId}`.
+8. O ranking é lido autenticado por `GET /runs/ranking`; ele deve ser calculado pelo backend com as runs e pontuações salvas.
 
 O app envia o token retornado pelo login no cabeçalho `Authorization: Bearer <token>`. Não coloque chaves privadas ou credenciais do banco no projeto Unity.
