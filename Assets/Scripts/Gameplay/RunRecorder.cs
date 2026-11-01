@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -25,6 +26,7 @@ public class RunRecorder : MonoBehaviour
 #pragma warning disable 0649 // preenchidos pelo JsonUtility
     [Serializable] private class RunData
     {
+        public string user_id;
         public string started_at;
         public string finished_at;
         public string status;
@@ -33,7 +35,7 @@ public class RunRecorder : MonoBehaviour
         public string app_version;
     }
 
-    [Serializable] private class ScoreInsert { public string stage; public int points; public int errors; public float duration_seconds; }
+    [Serializable] private class ScoreInsert { public int points; public string stage; }
     [Serializable] private class CreateRunBody
     {
         public RunData runData;
@@ -121,13 +123,11 @@ public class RunRecorder : MonoBehaviour
         var score = new ScoreInsert
         {
             stage = stage,
-            errors = e,
             points = Mathf.Max(0, PointsPerStage - PenaltyPerError * e),
-            duration_seconds = Mathf.Round((Time.time - stageStart) * 100f) / 100f,
         };
         stageStart = Time.time;
         scores.Add(score);
-        Debug.Log($"[RunRecorder] Etapa '{stage}': {score.points} pontos ({e} erros, {score.duration_seconds}s).");
+        Debug.Log($"[RunRecorder] Etapa '{stage}': {score.points} pontos ({e} erros).");
     }
 
     private void Finish(string status)
@@ -146,15 +146,16 @@ public class RunRecorder : MonoBehaviour
         foreach (var score in scores)
         {
             totalPoints += score.points;
-            totalErrors += score.errors;
+            totalErrors += ErrorsOf(score.stage);
         }
 
         var body = new CreateRunBody
         {
             runData = new RunData
             {
-                started_at = startedAtUtc.ToString("o"),
-                finished_at = DateTime.UtcNow.ToString("o"),
+                user_id = AuthSession.UserId,
+                started_at = UtcTimestamp(startedAtUtc),
+                finished_at = UtcTimestamp(DateTime.UtcNow),
                 status = status,
                 total_points = totalPoints,
                 total_errors = totalErrors,
@@ -180,4 +181,7 @@ public class RunRecorder : MonoBehaviour
     }
 
     private int ErrorsOf(string stage) => errors.TryGetValue(stage, out int n) ? n : 0;
+
+    private static string UtcTimestamp(DateTime value) =>
+        value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
 }
