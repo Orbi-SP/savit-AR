@@ -10,8 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d7521ceaf72849d3a76016ab058a67d4, type: 3}
-  m_Name: SupabaseConfig
-  m_EditorClassIdentifier: Assembly-CSharp::SupabaseConfig
-  url: https://eyakfzeaqhroiatvomog.supabase.co
-  anonKey: sb_publishable_XNKkhBjwjQJZXjv1E_K-dA_u6ZCo4Ji
+  m_Name: SavitApiConfig
+  m_EditorClassIdentifier: Assembly-CSharp::SavitApiConfig
+  baseUrl: https://ihrws12500.execute-api.us-east-1.amazonaws.com/default
   signupUrl:
