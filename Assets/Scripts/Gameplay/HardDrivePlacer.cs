@@ -66,6 +66,7 @@ public class HardDrivePlacer : MonoBehaviour
 	private bool isSnapped;
 	private float grabHandX;
 	private float grabAccum;
+	private float grabTime;
 
 	private readonly List<Transform> screws = new List<Transform>();
 	private Transform sataConnector;
@@ -141,6 +142,7 @@ public class HardDrivePlacer : MonoBehaviour
 		{
 			grabHandX = api.HandPositionX;
 			grabAccum = accum;
+			grabTime = Time.time;
 		}
 
 		if (holding)
@@ -171,6 +173,8 @@ public class HardDrivePlacer : MonoBehaviour
 			return;
 		}
 
+		// Soltou fora da gaveta: conta como erro na pontuação.
+		if (prevHolding && !holding) AssemblyEvents.Miss(AssemblyEvents.HardDrive, Time.time - grabTime);
 		prevHolding = holding;
 	}
 
@@ -229,6 +233,7 @@ public class HardDrivePlacer : MonoBehaviour
 		IsInstalled = true;
 		Debug.Log("✅ HD instalado (colocado, parafusado e ligado na placa-mãe).");
 		onInstalled?.Invoke();
+		AssemblyEvents.Complete(AssemblyEvents.HardDrive);
 	}
 
 	private IEnumerator MoveTo(Vector3 targetPos, Quaternion targetRot, float duration)

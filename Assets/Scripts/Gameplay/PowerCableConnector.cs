@@ -97,6 +97,7 @@ public class PowerCableConnector : MonoBehaviour
 	private float grabHandX;
 	private float grabProgress;
 	private float grabDir = 1f;
+	private float grabTime;
 	private bool isConnected;
 
 	private void Awake()
@@ -237,6 +238,7 @@ public class PowerCableConnector : MonoBehaviour
 			grabHandX = api.HandPositionX;
 			grabProgress = progress;
 			grabDir = ScreenDirectionToBoard();
+			grabTime = Time.time;
 		}
 
 		if (holding)
@@ -259,6 +261,8 @@ public class PowerCableConnector : MonoBehaviour
 			return;
 		}
 
+		// Soltou longe da placa-mãe: conta como erro na pontuação.
+		if (prevHolding && !holding) AssemblyEvents.Miss(AssemblyEvents.Atx24, Time.time - grabTime);
 		prevHolding = holding;
 	}
 
@@ -486,5 +490,6 @@ public class PowerCableConnector : MonoBehaviour
 
 		Debug.Log("[PowerCableConnector] Cabo ATX 24 pinos conectado na placa-mãe.");
 		onConnected?.Invoke();
+		AssemblyEvents.Complete(AssemblyEvents.Atx24);
 	}
 }

@@ -5,7 +5,7 @@ public class MenuController : MonoBehaviour
 {
     [SerializeField] private string gameSceneName = "BRP Sample SceneGabinete";
 
-    [Tooltip("Exige login (Supabase) antes de \"Iniciar Jogo\". A tela é montada pelo LoginController.")]
+    [Tooltip("Exige login antes de \"Iniciar Jogo\". A tela é montada pelo LoginController.")]
     [SerializeField] private bool requireLogin = true;
 
     private void Awake()

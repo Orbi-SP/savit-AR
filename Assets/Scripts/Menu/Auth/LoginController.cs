@@ -5,9 +5,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Tela de login do menu (e-mail + senha no Supabase). Montada por código por cima do Canvas do menu,
+/// Tela de login do menu (e-mail + senha no backend do SAVIT). Montada por código por cima do Canvas do menu,
 /// sem mexer nos objetos da cena: enquanto ninguém entra, o "Iniciar Jogo" fica escondido.
-/// "Criar conta" abre o site do SAVIT (SupabaseConfig.signupUrl). Adicionada pelo MenuController.
+/// "Criar conta" abre o site do SAVIT (SavitApiConfig.signupUrl). Adicionada pelo MenuController.
 /// O login é em pé; depois de entrar a tela volta a ficar deitada, como o resto do menu e o jogo.
 /// </summary>
 public class LoginController : MonoBehaviour
@@ -69,7 +69,7 @@ public class LoginController : MonoBehaviour
 
         // Sessão salva no aparelho: entra direto (continua deitado). Sem sessão, o login fica em pé.
         SetBusy(true, "Entrando...");
-        StartCoroutine(SupabaseAuth.TryRestore(ok =>
+        StartCoroutine(SavitAuth.TryRestore(ok =>
         {
             SetBusy(false, ok ? null : "");
             ShowLoggedIn(ok);
@@ -81,16 +81,16 @@ public class LoginController : MonoBehaviour
     {
         if (busy) return;
         SetBusy(true, "Entrando...");
-        StartCoroutine(SupabaseAuth.SignIn(emailInput.text, passwordInput.text, OnAuthResult));
+        StartCoroutine(SavitAuth.SignIn(emailInput.text, passwordInput.text, OnAuthResult));
     }
 
     /// <summary>Cadastro é feito no site do SAVIT.</summary>
     public void OpenSignUpSite()
     {
-        var config = SupabaseConfig.Load();
+        var config = SavitApiConfig.Load();
         if (config == null || string.IsNullOrWhiteSpace(config.signupUrl))
         {
-            SetBusy(false, "Endereço do site de cadastro não configurado (SupabaseConfig > Signup Url).");
+            SetBusy(false, "Endereço do site de cadastro não configurado (SavitApiConfig > Signup Url).");
             return;
         }
         Application.OpenURL(config.signupUrl);
@@ -99,13 +99,11 @@ public class LoginController : MonoBehaviour
     public void SignOut()
     {
         if (busy) return;
-        StartCoroutine(SupabaseAuth.SignOut(() =>
-        {
-            passwordInput.text = "";
-            SetBusy(false, "");
-            ShowLoggedIn(false);
-            ApplyOrientation(false);
-        }));
+        SavitAuth.SignOut();
+        passwordInput.text = "";
+        SetBusy(false, "");
+        ShowLoggedIn(false);
+        ApplyOrientation(false);
     }
 
     private void OnAuthResult(bool ok, string error)
