@@ -1,6 +1,59 @@
-# 🎮 Configuração Rápida - Unity MainMenu
+# 🎮 Configuração do SAVIT - Unity 6000.2.6f2
 
-Siga estes passos para configurar o sistema de login Arduino na cena MainMenu:
+Este guia descreve o fluxo atual do menu, autenticação e gravação de pontuação. O backend fica fora deste repositório: suas funções AWS Lambda recebem as requisições do aplicativo, validam o JWT e usam o Supabase para persistência.
+
+## Configuração da API
+
+O projeto já contém `Assets/Resources/SavitApiConfig.asset`.
+
+1. Abra `Assets/Resources/SavitApiConfig.asset` no Inspector.
+2. Em **Base Url**, mantenha `https://ihrws12500.execute-api.us-east-1.amazonaws.com/default`.
+3. Não crie outro asset com o mesmo nome em `Resources`; os scripts carregam este asset automaticamente.
+4. Não coloque chaves privadas, `service_role` ou credenciais do Supabase no Unity.
+
+## Fluxo atual do menu
+
+1. Abra `Assets/Scenes/MainMenu.unity`.
+2. O `MenuController` adiciona o `LoginController` automaticamente ao objeto do menu.
+3. O login é montado por código sobre o Canvas existente; não é necessário criar ou remover objetos da cena.
+4. O menu permanece em retrato.
+5. **Entrar** chama `POST /auth` com e-mail e senha. O JWT, `user_id`, usuário e e-mail são mantidos em memória e salvos em `PlayerPrefs`.
+6. **Criar conta** chama `POST /user` diretamente, usando o prefixo do e-mail como `username`; depois da criação, o aplicativo faz login automaticamente.
+7. **Jogar** só funciona com sessão válida e força a orientação paisagem antes de carregar `BRP Sample SceneGabinete`.
+
+## Fluxo de runs, pontuação e ranking
+
+1. Na cena de gameplay, o `RunRecorder` acompanha os eventos de encaixe publicados por `AssemblyEvents`.
+2. Cada componente concluído gera um item em `scoresData`: 100 pontos menos 10 por erro, com mínimo zero.
+3. Ao concluir o tutorial, a run é enviada com status `finished`. Se o jogador sair antes, ela é enviada com status `abandoned`.
+4. O envio é autenticado com `Authorization: Bearer <JWT>` para `POST /runs`.
+5. O corpo enviado contém `runData` com `user_id`, timestamps UTC em ISO 8601, status, totais e versão do aplicativo, além de `scoresData` com `points` e `stage`.
+6. A Lambda associa a run ao usuário autenticado e grava a run e os scores no Supabase. O cliente Unity não acessa o banco diretamente.
+7. O ranking deve ser consultado pelo backend em `GET /runs/ranking`; o aplicativo pode usar `SavitApi.GetRanking`.
+
+Exemplo de payload:
+
+```json
+{
+  "runData": {
+    "user_id": "uuid-do-usuario",
+    "started_at": "2026-11-01T18:19:44.138Z",
+    "finished_at": "2026-11-01T18:20:24.700Z",
+    "status": "finished",
+    "total_points": 460,
+    "total_errors": 4,
+    "app_version": "0.5.0"
+  },
+  "scoresData": [
+    { "points": 80, "stage": "ram" },
+    { "points": 100, "stage": "motherboard" }
+  ]
+}
+```
+
+## Fluxo legado do Arduino
+
+Os passos abaixo são mantidos apenas para compatibilidade com instalações antigas que ainda possuem `ArduinoLoginController`. O fluxo principal atual é o login por e-mail descrito acima.
 
 ## 📋 Passo a Passo
 
@@ -122,17 +175,6 @@ Se quiser mostrar uma tela de "Aguardando Login":
 
 Pronto! Agora quando clicar em Jogar, o Unity vai aguardar a requisição da sua API Python! 🚀
 
-## Configurar a API do SAVIT (Unity 6000.2.6f2)
+## Observação final
 
-O projeto já contém o asset `Assets/Resources/SavitApiConfig.asset`. No Unity 6000.2.6f2:
-
-1. Abra `Assets/Resources/SavitApiConfig.asset` no Inspector.
-2. Em **Base Url**, mantenha `https://ihrws12500.execute-api.us-east-1.amazonaws.com/default`.
-3. O botão **Criar conta** usa diretamente `POST /user`; não é necessário configurar ou abrir um site externo.
-4. Não crie outro asset com o mesmo nome em `Resources`; os scripts carregam este asset automaticamente.
-5. Salve a cena e execute o menu. O menu fica em retrato; o botão **Jogar** força paisagem antes de carregar a cena `BRP Sample SceneGabinete`.
-6. O login usa `POST /auth`; o cadastro usa `POST /user` e entra automaticamente após a criação.
-7. Ao terminar ou abandonar a cena `BRP Sample SceneGabinete`, o app envia uma requisição autenticada `POST /runs` com `runData` (incluindo `user_id`) e `scoresData`. Cada item de `scoresData` contém somente `points` e `stage`; ele representa um componente com 100 pontos, menos 10 por erro.
-8. O ranking é lido autenticado por `GET /runs/ranking`; ele deve ser calculado pelo backend com as runs e pontuações salvas.
-
-O app envia o token retornado pelo login no cabeçalho `Authorization: Bearer <token>`. Não coloque chaves privadas ou credenciais do banco no projeto Unity.
+O fluxo legado do Arduino permanece documentado acima apenas para instalações antigas. Para o fluxo atual, use as seções de API, menu e pontuação no início deste arquivo.
