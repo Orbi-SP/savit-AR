@@ -52,7 +52,7 @@ Cada componente concluído começa com 100 pontos e perde 10 pontos por erro, se
 
 Assista a uma demonstração prática do projeto em funcionamento no vídeo abaixo:
 
-[![Assista no YouTube](https://img.youtube.com/vi/m10MDB0VFqk/0.jpg)](https://www.youtube.com/watch?v=m10MDB0VFqk)
+[![Assista no YouTube](https://img.youtube.com/vi/m10MDB0VFqk/0.jpg)](https://www.youtube.com/watch?v=Ej5gLzyrLUE)
 
 ## Como Utilizar
 O software ainda está em desenvolvimento. Você pode:
