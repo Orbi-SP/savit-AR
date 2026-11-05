@@ -65,6 +65,28 @@ O APK fica disponível nas Releases do GitHub:
 
 - https://github.com/Orbi-SP/savit-AR/releases
 
+### CI/CD e publicação automática do APK
+
+O projeto possui um workflow do GitHub Actions em
+[`.github/workflows/build-android.yml`](./.github/workflows/build-android.yml) que executa o build
+Android com o Unity **6000.2.6f2**. O fluxo:
+
+1. É executado a cada push na branch `main`, por uma tag de versão (`v1.2.3` ou `V1.2.3`) ou manualmente pelo GitHub Actions.
+2. Lê a versão definida no `bundleVersion` em `ProjectSettings/ProjectSettings.asset`.
+3. Faz o build do APK Android usando o `game-ci/unity-builder`.
+4. Salva o APK como artefato do workflow por 14 dias.
+5. Cria uma GitHub Release e anexa o APK com o nome `savit-vX.Y.Z.apk` quando a versão ainda não possui uma tag correspondente.
+
+Para publicar uma nova versão automaticamente, altere o campo `bundleVersion` no
+Unity em **Edit > Project Settings > Player > Other Settings > Identification > Version**
+e envie a alteração para a `main`. O valor deve seguir o formato `MAJOR.MINOR.PATCH`,
+por exemplo `0.0.2`. O workflow cria a tag `v0.0.2` e a release correspondente. Também
+é possível publicar diretamente enviando uma tag como `v1.2.3`.
+
+O repositório precisa ter os secrets `UNITY_LICENSE`, `UNITY_EMAIL` e
+`UNITY_PASSWORD` configurados em **Settings > Secrets and variables > Actions**. A
+release é criada com as permissões de conteúdo configuradas pelo próprio workflow.
+
 ### Rodar no Unity (modo de desenvolvimento)
 Para executar no Unity, você precisará dos itens abaixo:
 

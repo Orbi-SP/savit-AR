@@ -98,6 +98,7 @@ public class TutorialManager : MonoBehaviour
 		DisableRaycast(hintText);
 
 		if (autoLayout) ApplyLandscapeLayout();
+		ApplyARUIReadabilityScale();
 		HideAll();
 	}
 
@@ -161,6 +162,44 @@ public class TutorialManager : MonoBehaviour
 		text.fontSizeMax = maxSize;
 		text.alignment = alignment;
 		text.overflowMode = TextOverflowModes.Overflow;
+	}
+
+	private void ApplyARUIReadabilityScale()
+	{
+		foreach (TMP_Text text in GetComponentsInChildren<TMP_Text>(true))
+		{
+			if (IsTutorialOrHint(text.transform)) continue;
+
+			text.fontSize *= 2f;
+			text.rectTransform.sizeDelta *= 2f;
+			text.textWrappingMode = TextWrappingModes.NoWrap;
+			text.overflowMode = TextOverflowModes.Overflow;
+		}
+
+		foreach (Button button in GetComponentsInChildren<Button>(true))
+		{
+			if (IsTutorialOrHint(button.transform)) continue;
+
+			RectTransform rect = button.transform as RectTransform;
+			if (rect != null) rect.sizeDelta *= 2f;
+		}
+
+		foreach (Slider slider in GetComponentsInChildren<Slider>(true))
+		{
+			if (IsTutorialOrHint(slider.transform)) continue;
+
+			slider.transform.localScale *= 2f;
+		}
+	}
+
+	private bool IsTutorialOrHint(Transform candidate)
+	{
+		for (Transform current = candidate; current != null && current != transform; current = current.parent)
+		{
+			if (current.name == "TutorialPanel" || current.name == "HintPanel") return true;
+		}
+
+		return false;
 	}
 
 	private void OnDestroy()
