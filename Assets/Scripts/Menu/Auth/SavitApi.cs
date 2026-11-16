@@ -21,7 +21,7 @@ public static class SavitApi
         var config = SavitApiConfig.Load();
         if (config == null || !config.IsValid)
         {
-            const string error = "SavitApiConfig não está configurado.";
+            const string error = "SavitApiConfig is not configured.";
             Debug.LogError("[SavitApi] " + error);
             done?.Invoke(0, error);
             yield break;
@@ -53,7 +53,7 @@ public static class SavitApi
         var config = SavitApiConfig.Load();
         if (config == null || !config.IsValid)
         {
-            Debug.LogError("[SavitApi] SavitApiConfig não está configurado.");
+            Debug.LogError("[SavitApi] SavitApiConfig is not configured.");
             return;
         }
 

@@ -72,7 +72,7 @@ public class LoginController : MonoBehaviour
         ShowLoggedIn(false);
 
         // Sessão salva no aparelho: entra direto, mantendo o menu em pé.
-        SetBusy(true, "Entrando...");
+        SetBusy(true, "Signing in...");
         StartCoroutine(SavitAuth.TryRestore(ok =>
         {
             SetBusy(false, ok ? null : "");
@@ -83,7 +83,7 @@ public class LoginController : MonoBehaviour
     public void SignIn()
     {
         if (busy) return;
-        SetBusy(true, "Entrando...");
+        SetBusy(true, "Signing in...");
         StartCoroutine(SavitAuth.SignIn(emailInput.text, passwordInput.text, OnAuthResult));
     }
 
@@ -137,7 +137,7 @@ public class LoginController : MonoBehaviour
         if (overlay != null) overlay.SetActive(!loggedIn);
         if (loggedBar != null) loggedBar.SetActive(loggedIn);
         if (startButton != null) startButton.SetActive(loggedIn);
-        if (loggedIn && greetingText != null) greetingText.text = $"Olá, <b>{AuthSession.Email}</b>";
+        if (loggedIn && greetingText != null) greetingText.text = $"Hello, <b>{AuthSession.Email}</b>";
     }
 
     private void SetBusy(bool value, string status)
@@ -162,30 +162,30 @@ public class LoginController : MonoBehaviour
         cardRect = card.GetComponent<RectTransform>();
 
         // Âncoras deitado na criação; as de "em pé" (tela inteira, botões empilhados) vão no Portrait(...).
-        var title = Label(card.transform, "Entrar no SAVIT", new Vector2(0.05f, 0.85f), new Vector2(0.95f, 0.96f), 20f, 44f, FontStyles.Bold);
+        var title = Label(card.transform, "Sign in to SAVIT", new Vector2(0.05f, 0.85f), new Vector2(0.95f, 0.96f), 20f, 44f, FontStyles.Bold);
         Portrait(title, new Vector2(0.08f, 0.78f), new Vector2(0.92f, 0.86f));
-        var subtitle = Label(card.transform, "Entre com seu e-mail e senha.", new Vector2(0.05f, 0.76f), new Vector2(0.95f, 0.84f), 12f, 24f, FontStyles.Normal);
+        var subtitle = Label(card.transform, "Sign in with your email and password.", new Vector2(0.05f, 0.76f), new Vector2(0.95f, 0.84f), 12f, 24f, FontStyles.Normal);
         Portrait(subtitle, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.77f));
 
-        emailInput = CreateInput(card.transform, resources, "E-mail", new Vector2(0.08f, 0.61f), new Vector2(0.92f, 0.72f), false);
+        emailInput = CreateInput(card.transform, resources, "Email", new Vector2(0.08f, 0.61f), new Vector2(0.92f, 0.72f), false);
         Portrait(emailInput, new Vector2(0.08f, 0.62f), new Vector2(0.92f, 0.68f));
-        passwordInput = CreateInput(card.transform, resources, "Senha", new Vector2(0.08f, 0.47f), new Vector2(0.92f, 0.58f), true);
+        passwordInput = CreateInput(card.transform, resources, "Password", new Vector2(0.08f, 0.47f), new Vector2(0.92f, 0.58f), true);
         Portrait(passwordInput, new Vector2(0.08f, 0.54f), new Vector2(0.92f, 0.60f));
         passwordInput.onSubmit.AddListener(_ => SignIn());
 
         statusText = Label(card.transform, "", new Vector2(0.05f, 0.35f), new Vector2(0.95f, 0.45f), 11f, 20f, FontStyles.Normal);
         Portrait(statusText, new Vector2(0.08f, 0.46f), new Vector2(0.92f, 0.53f));
 
-        signInButton = ButtonWithText(card.transform, resources, "Entrar", new Vector2(0.08f, 0.19f), new Vector2(0.48f, 0.31f), SignIn);
+        signInButton = ButtonWithText(card.transform, resources, "Sign in", new Vector2(0.08f, 0.19f), new Vector2(0.48f, 0.31f), SignIn);
         Portrait(signInButton, new Vector2(0.08f, 0.37f), new Vector2(0.92f, 0.44f));
-        var signUpButton = ButtonWithText(card.transform, resources, "Criar conta", new Vector2(0.52f, 0.19f), new Vector2(0.92f, 0.31f), CreateAccount);
+        var signUpButton = ButtonWithText(card.transform, resources, "Create account", new Vector2(0.52f, 0.19f), new Vector2(0.92f, 0.31f), CreateAccount);
         Portrait(signUpButton, new Vector2(0.08f, 0.28f), new Vector2(0.92f, 0.35f));
-        var quitButton = ButtonWithText(card.transform, resources, "Sair do jogo", new Vector2(0.32f, 0.05f), new Vector2(0.68f, 0.14f), Application.Quit);
+        var quitButton = ButtonWithText(card.transform, resources, "Quit game", new Vector2(0.32f, 0.05f), new Vector2(0.68f, 0.14f), Application.Quit);
         Portrait(quitButton, new Vector2(0.25f, 0.17f), new Vector2(0.75f, 0.23f));
 
         loggedBar = Panel("LoggedBar", canvas, new Vector2(0.60f, 0.88f), new Vector2(0.99f, 0.98f), new Color(0f, 0f, 0f, 0.55f));
         greetingText = Label(loggedBar.transform, "", new Vector2(0.03f, 0f), new Vector2(0.55f, 1f), 11f, 22f, FontStyles.Normal);
-        ButtonWithText(loggedBar.transform, resources, "Trocar usuário", new Vector2(0.58f, 0.12f), new Vector2(0.98f, 0.88f), SignOut);
+        ButtonWithText(loggedBar.transform, resources, "Switch user", new Vector2(0.58f, 0.12f), new Vector2(0.98f, 0.88f), SignOut);
 
         overlay.transform.SetAsLastSibling();
     }
