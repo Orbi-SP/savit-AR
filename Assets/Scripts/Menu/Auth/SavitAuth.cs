@@ -59,16 +59,16 @@ public static class SavitAuth
         // E-mail como foi digitado; só tira espaços das pontas (o teclado do celular costuma pôr um no fim).
         string mail = (email ?? "").Trim();
         var config = SavitApiConfig.Load();
-        if (config == null || !config.IsValid) { done(false, "Login não configurado: preencha Assets/Resources/SavitApiConfig."); yield break; }
-        if (mail.IndexOf('@') <= 0) { done(false, "Digite um e-mail válido."); yield break; }
-        if (string.IsNullOrEmpty(password)) { done(false, "Digite a senha."); yield break; }
+        if (config == null || !config.IsValid) { done(false, "Sign-in is not configured. Please configure Assets/Resources/SavitApiConfig."); yield break; }
+        if (mail.IndexOf('@') <= 0) { done(false, "Enter a valid email address."); yield break; }
+        if (string.IsNullOrEmpty(password)) { done(false, "Enter your password."); yield break; }
 
         string body = JsonUtility.ToJson(new LoginBody { email = mail, password = password });
         yield return SavitApi.Send("POST", "/auth", body, false, (status, json) =>
         {
-            if (status == 0) { done(false, "Sem conexão com a internet. Verifique e tente de novo."); return; }
-            if (status == 401) { done(false, "E-mail ou senha incorretos. Ainda não tem conta? Toque em Criar conta."); return; }
-            if (!SavitApi.IsSuccess(status)) { done(false, ErrorText(json) ?? "Não foi possível entrar agora. Tente de novo."); return; }
+            if (status == 0) { done(false, "No internet connection. Check your connection and try again."); return; }
+            if (status == 401) { done(false, "Incorrect email or password. Do not have an account yet? Select Create account."); return; }
+            if (!SavitApi.IsSuccess(status)) { done(false, ErrorText(json) ?? "Unable to sign in right now. Please try again."); return; }
 
             LoginResponse res = null;
             try { res = JsonUtility.FromJson<LoginResponse>(json); } catch (Exception) { }
@@ -79,7 +79,7 @@ public static class SavitAuth
             if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(profile.id))
             {
                 Debug.LogWarning("[SavitAuth] Resposta do /auth sem token ou sem perfil: " + json);
-                done(false, "O servidor não devolveu o acesso. Tente de novo mais tarde.");
+                done(false, "The server did not return access credentials. Please try again later.");
                 return;
             }
 
@@ -94,16 +94,16 @@ public static class SavitAuth
         string name = (username ?? "").Trim();
         string mail = (email ?? "").Trim();
         var config = SavitApiConfig.Load();
-        if (config == null || !config.IsValid) { done(false, "Cadastro não configurado: preencha Assets/Resources/SavitApiConfig."); yield break; }
-        if (string.IsNullOrEmpty(name)) { done(false, "Digite um nome de usuário."); yield break; }
-        if (mail.IndexOf('@') <= 0) { done(false, "Digite um e-mail válido."); yield break; }
-        if (string.IsNullOrEmpty(password)) { done(false, "Digite a senha."); yield break; }
+        if (config == null || !config.IsValid) { done(false, "Account creation is not configured. Please configure Assets/Resources/SavitApiConfig."); yield break; }
+        if (string.IsNullOrEmpty(name)) { done(false, "Enter a username."); yield break; }
+        if (mail.IndexOf('@') <= 0) { done(false, "Enter a valid email address."); yield break; }
+        if (string.IsNullOrEmpty(password)) { done(false, "Enter your password."); yield break; }
 
         string body = JsonUtility.ToJson(new SignUpBody { username = name, email = mail, password = password });
         yield return SavitApi.Send("POST", "/user", body, false, (status, json) =>
         {
-            if (status == 0) { done(false, "Sem conexão com a internet. Verifique e tente de novo."); return; }
-            if (!SavitApi.IsSuccess(status)) { done(false, ErrorText(json) ?? "Não foi possível criar o usuário."); return; }
+            if (status == 0) { done(false, "No internet connection. Check your connection and try again."); return; }
+            if (!SavitApi.IsSuccess(status)) { done(false, ErrorText(json) ?? "Unable to create the user."); return; }
             done(true, null);
         });
     }

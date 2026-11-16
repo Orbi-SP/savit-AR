@@ -41,8 +41,8 @@ namespace SavitGame.AR {
         public GameObject yawSlider;
 
         [Header("UI - Textos")]
-        public string previewText = "Ver como está";
-        public string backToPlaceText = "Voltar a colocar";
+        public string previewText = "Preview";
+        public string backToPlaceText = "Place Again";
 
         [Header("Ajustes do Ghost")]
         [Tooltip("Velocidade de suavização do ghost ao acompanhar o pose")]

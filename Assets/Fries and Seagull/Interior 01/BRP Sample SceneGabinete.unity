@@ -176,7 +176,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Mostrar RAM
+  m_text: Show RAM
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -481,7 +481,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Colocar Aqui
+  m_text: Place Here
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -726,7 +726,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Ver como est\xE1"
+  m_text: Preview
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1315,7 +1315,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 60}
+  m_AnchoredPosition: {x: 0, y: 130}
   m_SizeDelta: {x: 390, y: 136}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &424645920
@@ -1450,7 +1450,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Toque para posicionar
+  m_text: Tap to place
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2688,8 +2688,8 @@ MonoBehaviour:
   confirmButton: {fileID: 424645918}
   previewToggleButton: {fileID: 1908341122}
   yawSlider: {fileID: 1274363725}
-  previewText: "Ver como est\xE1"
-  backToPlaceText: Voltar a colocar
+  previewText: Preview
+  backToPlaceText: Place Again
   ghostFollowSpeed: 12
   ghostVerticalOffset: 0.005
   snapToSurface: 1
@@ -2780,7 +2780,7 @@ MonoBehaviour:
   titleText: {fileID: 305054856}
   bodyText: {fileID: 1206226325}
   okButton: {fileID: 1952447489}
-  okButtonText: Entendi
+  okButtonText: Got it
   hintPanel: {fileID: 422776629}
   hintText: {fileID: 1852276533}
   audioSource: {fileID: 0}
@@ -2788,67 +2788,65 @@ MonoBehaviour:
   menuSceneName: MainMenu
   steps:
   - id: intro
-    title: Montagem do PC
-    explanation: "Ol\xE1! Vou te ensinar a montar um computador, uma pe\xE7a de cada
-      vez.\n\nAntes de cada encaixe eu explico para que serve o componente. Depois
-      \xE9 a sua vez: feche a m\xE3o para segurar a pe\xE7a, mova at\xE9 o lugar
-      certo e abra a m\xE3o para soltar."
+    title: PC Assembly
+    explanation: "Hello! I will teach you how to assemble a computer, one component at a
+      time.\n\nBefore each installation, I will explain what the component does. Then
+      it is your turn: close your hand to pick up the component, move it to the correct
+      position, and open your hand to release it."
     actionHint: 
     voice: {fileID: 0}
     componentType: 
     doneProperty: 
   - id: ram
-    title: "Mem\xF3ria RAM"
-    explanation: "A mem\xF3ria RAM guarda temporariamente os dados que o processador
-      est\xE1 usando naquele momento. Ela \xE9 muito r\xE1pida, mas perde tudo quando
-      o computador \xE9 desligado.\n\nQuanto mais RAM, mais programas o PC consegue
-      manter abertos ao mesmo tempo."
-    actionHint: "Feche a m\xE3o para segurar a mem\xF3ria RAM e leve-a at\xE9 o slot
-      da placa-m\xE3e."
+    title: RAM
+    explanation: "RAM temporarily stores the data that the processor is currently using.
+      It is very fast, but it loses its data when the computer is turned off.\n\nThe
+      more RAM a computer has, the more programs it can keep open at the same time."
+    actionHint: "Close your hand to pick up the RAM module and move it to the motherboard
+      slot."
     voice: {fileID: 0}
     componentType: RAMModule
     doneProperty: IsSnapped
   - id: motherboard
-    title: "Placa-m\xE3e"
-    explanation: "A placa-m\xE3e \xE9 a pe\xE7a principal do computador: \xE9 nela
-      que todos os outros componentes se conectam, como o processador, a mem\xF3ria,
-      o armazenamento e a energia.\n\nEla faz a comunica\xE7\xE3o entre todas as
-      pe\xE7as."
-    actionHint: "Segure a placa-m\xE3e e posicione-a dentro do gabinete."
+    title: Motherboard
+    explanation: "The motherboard is the computer's main component. All other components
+      connect to it, including the processor, memory, storage, and power supply.\n\nIt
+      enables communication between all the components."
+    actionHint: "Pick up the motherboard and position it inside the case."
     voice: {fileID: 0}
     componentType: MotherboardPlacer
     doneProperty: IsSnapped
   - id: psu
-    title: "Fonte de alimenta\xE7\xE3o"
-    explanation: "A fonte de alimenta\xE7\xE3o transforma a energia da tomada nas
-      tens\xF5es que o computador usa e distribui essa energia para todas as pe\xE7as.\n\nUma
-      fonte de qualidade protege os componentes contra varia\xE7\xF5es de energia."
-    actionHint: "Segure a fonte e encaixe-a no espa\xE7o dela no gabinete."
+    title: Power Supply
+    explanation: "The power supply converts electricity from the outlet into the voltages
+      used by the computer and distributes power to all components.\n\nA high-quality
+      power supply protects the components from power fluctuations."
+    actionHint: "Pick up the power supply and install it in its place inside the case."
     voice: {fileID: 0}
     componentType: PowerSupplyPlacer
     doneProperty: IsSnapped
   - id: atx24
-    title: Cabo ATX 24 pinos
-    explanation: "O cabo ATX de 24 pinos \xE9 o cabo principal de energia: ele leva
-      a energia da fonte at\xE9 a placa-m\xE3e.\n\nSem ele conectado, a placa-m\xE3e
-      n\xE3o liga."
-    actionHint: "Segure o conector do cabo e leve-o at\xE9 o conector de energia
-      da placa-m\xE3e."
+    title: 24-Pin ATX Cable
+    explanation: "The 24-pin ATX cable is the main power cable. It carries power from
+      the power supply to the motherboard.\n\nThe motherboard will not turn on without
+      it connected."
+    actionHint: "Pick up the cable connector and move it to the motherboard's power
+      connector."
     voice: {fileID: 0}
     componentType: PowerCableConnector
     doneProperty: IsConnected
   - id: hd
-    title: "HD (disco r\xEDgido)"
-    explanation: "O HD \xE9 o armazenamento do computador: \xE9 onde ficam guardados
-      o sistema operacional, os programas e os seus arquivos, mesmo com o PC desligado.\n\nEle
-      \xE9 parafusado no gabinete e ligado \xE0 placa-m\xE3e pelo cabo SATA."
-    actionHint: Segure o HD e encaixe-o na baia do gabinete.
+    title: Hard Drive
+    explanation: "The hard drive is the computer's storage device. It stores the operating
+      system, programs, and files even when the computer is turned off.\n\nIt is screwed
+      into the case and connected to the motherboard with a SATA cable."
+    actionHint: Pick up the hard drive and install it in the drive bay.
     voice: {fileID: 0}
     componentType: HardDrivePlacer
     doneProperty: IsInstalled
   - id: fim
-    title: "Parab\xE9ns!"
-    explanation: "Voc\xEA concluiu a montagem das pe\xE7as do computador. Muito bem!"
+    title: "Congratulations!"
+    explanation: "You have completed the computer assembly. Well done!"
     actionHint: 
     voice: {fileID: 0}
     componentType: 
@@ -2995,7 +2993,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Aponte para uma superf\xEDcie plana"
+  m_text: "Point at a flat surface"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -3922,7 +3920,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Reposicionar
+  m_text: Reposition
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4058,7 +4056,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Mostrar Monitor
+  m_text: Show Monitor
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4351,7 +4349,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: Got it
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4552,7 +4550,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Toque na tela para come\xE7ar"
+  m_text: "Tap the screen to start"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -5057,7 +5055,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Mostrar Placa m\xE3e"
+  m_text: "Show Motherboard"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

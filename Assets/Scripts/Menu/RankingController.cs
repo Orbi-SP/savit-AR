@@ -100,7 +100,7 @@ public class RankingController : MonoBehaviour
     private IEnumerator LoadGlobalCoroutine()
     {
         loading = true;
-        SetStatus("Carregando ranking global...");
+        SetStatus("Loading global ranking...");
         ClearRows();
 
         long status = 0;
@@ -114,21 +114,21 @@ public class RankingController : MonoBehaviour
         loading = false;
         if (!SavitApi.IsSuccess(status))
         {
-            SetStatus("Não foi possível carregar o ranking global.");
+            SetStatus("Unable to load the global ranking.");
             yield break;
         }
 
         GlobalEntry[] entries;
         if (!TryParseArray(json, out GlobalResponse response) || response.items == null)
         {
-            SetStatus("Resposta inválida do ranking global.");
+            SetStatus("Invalid global ranking response.");
             Debug.LogError("[RankingController] A API devolveu um ranking global inválido.");
             yield break;
         }
 
         entries = BestRunPerUser(response.items);
-        titleText.text = "Ranking Global";
-        SetStatus(entries.Length == 0 ? "Nenhuma partida encontrada." : "");
+        titleText.text = "Global Ranking";
+        SetStatus(entries.Length == 0 ? "No runs found." : "");
         for (int i = 0; i < entries.Length; i++)
             AddRow($"{i + 1}º", entries[i].username, entries[i].total_points, FormatMilliseconds(entries[i].time_spent_ms));
     }
@@ -175,7 +175,7 @@ public class RankingController : MonoBehaviour
     private IEnumerator LoadPersonalCoroutine()
     {
         loading = true;
-        SetStatus("Carregando meu ranking...");
+        SetStatus("Loading my ranking...");
         ClearRows();
 
         long status = 0;
@@ -189,13 +189,13 @@ public class RankingController : MonoBehaviour
         loading = false;
         if (!SavitApi.IsSuccess(status))
         {
-            SetStatus("Não foi possível carregar seu ranking.");
+            SetStatus("Unable to load your ranking.");
             yield break;
         }
 
         if (!TryParseArray(json, out UserResponse response) || response.items == null)
         {
-            SetStatus("Resposta inválida do seu ranking.");
+            SetStatus("Invalid personal ranking response.");
             Debug.LogError("[RankingController] A API devolveu um ranking pessoal inválido.");
             yield break;
         }
@@ -211,8 +211,8 @@ public class RankingController : MonoBehaviour
             return rightDate.CompareTo(leftDate);
         });
 
-        titleText.text = "Meu Ranking";
-        SetStatus(response.items.Length == 0 ? "Nenhuma partida encontrada." : "");
+        titleText.text = "My Ranking";
+        SetStatus(response.items.Length == 0 ? "No runs found." : "");
         for (int i = 0; i < response.items.Length; i++)
         {
             UserEntry entry = response.items[i];
@@ -231,14 +231,14 @@ public class RankingController : MonoBehaviour
         var card = Panel("RankingCard", overlay.transform, new Vector2(0.05f, 0.06f), new Vector2(0.95f, 0.94f),
             new Color(0.12f, 0.12f, 0.15f, 0.98f));
 
-        ButtonWithText(card.transform, resources, "Voltar ao Menu",
+        ButtonWithText(card.transform, resources, "Return to Menu",
             new Vector2(0.04f, 0.90f), new Vector2(0.30f, 0.98f), Close);
-        globalButton = ButtonWithText(card.transform, resources, "Ranking Global",
+        globalButton = ButtonWithText(card.transform, resources, "Global Ranking",
             new Vector2(0.34f, 0.90f), new Vector2(0.63f, 0.98f), LoadGlobal);
-        personalButton = ButtonWithText(card.transform, resources, "Meu Ranking",
+        personalButton = ButtonWithText(card.transform, resources, "My Ranking",
             new Vector2(0.67f, 0.90f), new Vector2(0.96f, 0.98f), LoadPersonal);
 
-        titleText = Label(card.transform, "Ranking Global", new Vector2(0.05f, 0.82f), new Vector2(0.95f, 0.89f), 18f, 34f, FontStyles.Bold);
+        titleText = Label(card.transform, "Global Ranking", new Vector2(0.05f, 0.82f), new Vector2(0.95f, 0.89f), 18f, 34f, FontStyles.Bold);
         statusText = Label(card.transform, "", new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.16f), 12f, 22f, FontStyles.Normal);
 
         var scrollObject = new GameObject("RankingScroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
@@ -272,7 +272,7 @@ public class RankingController : MonoBehaviour
         row.transform.SetParent(listContent, false);
         row.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.08f);
         row.GetComponent<LayoutElement>().minHeight = 46f;
-        var text = Label(row.transform, $"{position}  {username}\n{points} pontos  -  {time}",
+        var text = Label(row.transform, $"{position}  {username}\n{points} points  -  {time}",
             Vector2.zero, Vector2.one, 12f, 24f, FontStyles.Normal);
         text.alignment = TextAlignmentOptions.MidlineLeft;
         text.margin = new Vector4(12f, 3f, 8f, 3f);
@@ -304,7 +304,7 @@ public class RankingController : MonoBehaviour
     {
         if (!DateTimeOffset.TryParse(startedAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTimeOffset start) ||
             !DateTimeOffset.TryParse(finishedAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTimeOffset finish))
-            return "tempo indisponível";
+            return "time unavailable";
         return FormatTime(finish - start);
     }
 

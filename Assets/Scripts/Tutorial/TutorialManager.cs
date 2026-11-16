@@ -52,7 +52,7 @@ public class TutorialManager : MonoBehaviour
 	public TMP_Text bodyText;
 	public Button okButton;
 	[Tooltip("Texto do botão que fecha a explicação (na cena ele vinha como \"Button\").")]
-	public string okButtonText = "Entendi";
+	public string okButtonText = "Got it";
 
 	[Header("Legenda curta (durante o encaixe)")]
 	public GameObject hintPanel;
@@ -339,7 +339,7 @@ public class TutorialManager : MonoBehaviour
 		if (stopButton == null)
 		{
 			var resources = new TMP_DefaultControls.Resources();
-			stopButton = CreateButton(canvas.transform, resources, "Parar",
+			stopButton = CreateButton(canvas.transform, resources, "Stop",
 				new Vector2(0.78f, 0.88f), new Vector2(0.98f, 0.98f), OpenCompletionOptions);
 			stopButton.gameObject.name = "ButtonParar";
 		}
@@ -372,13 +372,13 @@ public class TutorialManager : MonoBehaviour
 		var overlay = CreatePanel("CompletionOverlay", parent, Vector2.zero, Vector2.one, new Color(0f, 0f, 0f, 0.88f));
 		var card = CreatePanel("CompletionCard", overlay.transform, new Vector2(0.20f, 0.22f), new Vector2(0.80f, 0.78f),
 			new Color(0.12f, 0.12f, 0.15f, 0.98f));
-		CreateLabel(card.transform, "Montagem concluída!", new Vector2(0.08f, 0.65f), new Vector2(0.92f, 0.88f),
+		CreateLabel(card.transform, "Assembly completed!", new Vector2(0.08f, 0.65f), new Vector2(0.92f, 0.88f),
 			24f, 56f, FontStyles.Bold);
-		CreateLabel(card.transform, "Escolha o que deseja fazer:", new Vector2(0.08f, 0.49f), new Vector2(0.92f, 0.65f),
+		CreateLabel(card.transform, "Choose what you would like to do:", new Vector2(0.08f, 0.49f), new Vector2(0.92f, 0.65f),
 			16f, 34f, FontStyles.Normal);
-		CreateButton(card.transform, resources, "Voltar ao menu", new Vector2(0.12f, 0.30f), new Vector2(0.88f, 0.44f),
+		CreateButton(card.transform, resources, "Return to menu", new Vector2(0.12f, 0.30f), new Vector2(0.88f, 0.44f),
 			() => FindFirstObjectByType<TutorialManager>()?.ReturnToMenu());
-		CreateButton(card.transform, resources, "Sair do jogo", new Vector2(0.12f, 0.10f), new Vector2(0.88f, 0.24f), QuitGame);
+		CreateButton(card.transform, resources, "Quit game", new Vector2(0.12f, 0.10f), new Vector2(0.88f, 0.24f), QuitGame);
 		overlay.SetActive(false);
 		return overlay;
 	}
@@ -465,31 +465,31 @@ public class TutorialManager : MonoBehaviour
 	{
 		return new[]
 		{
-			new TutorialStep("intro", "Montagem do PC",
-				"Olá! Vou te ensinar a montar um computador, uma peça de cada vez.\n\nAntes de cada encaixe eu explico para que serve o componente. Depois é a sua vez: feche a mão para segurar a peça, mova até o lugar certo e abra a mão para soltar.",
+			new TutorialStep("intro", "PC Assembly",
+				"Hello! I will teach you how to assemble a computer, one component at a time.\n\nBefore each installation, I will explain what the component does. Then it is your turn: close your hand to pick up the component, move it to the correct position, and open your hand to release it.",
 				"", "", ""),
-			new TutorialStep("ram", "Memória RAM",
-				"A memória RAM guarda temporariamente os dados que o processador está usando naquele momento. Ela é muito rápida, mas perde tudo quando o computador é desligado.\n\nQuanto mais RAM, mais programas o PC consegue manter abertos ao mesmo tempo.",
-				"Feche a mão para segurar a memória RAM e leve-a até o slot da placa-mãe.",
+			new TutorialStep("ram", "RAM",
+				"RAM temporarily stores the data that the processor is currently using. It is very fast, but it loses its data when the computer is turned off.\n\nThe more RAM a computer has, the more programs it can keep open at the same time.",
+				"Close your hand to pick up the RAM module and move it to the motherboard slot.",
 				"RAMModule", "IsSnapped"),
-			new TutorialStep("motherboard", "Placa-mãe",
-				"A placa-mãe é a peça principal do computador: é nela que todos os outros componentes se conectam, como o processador, a memória, o armazenamento e a energia.\n\nEla faz a comunicação entre todas as peças.",
-				"Segure a placa-mãe e posicione-a dentro do gabinete.",
+			new TutorialStep("motherboard", "Motherboard",
+				"The motherboard is the computer's main component. All other components connect to it, including the processor, memory, storage, and power supply.\n\nIt enables communication between all the components.",
+				"Pick up the motherboard and position it inside the case.",
 				"MotherboardPlacer", "IsSnapped"),
-			new TutorialStep("psu", "Fonte de alimentação",
-				"A fonte de alimentação transforma a energia da tomada nas tensões que o computador usa e distribui essa energia para todas as peças.\n\nUma fonte de qualidade protege os componentes contra variações de energia.",
-				"Segure a fonte e encaixe-a no espaço dela no gabinete.",
+			new TutorialStep("psu", "Power Supply",
+				"The power supply converts electricity from the outlet into the voltages used by the computer and distributes power to all components.\n\nA high-quality power supply protects the components from power fluctuations.",
+				"Pick up the power supply and install it in its place inside the case.",
 				"PowerSupplyPlacer", "IsSnapped"),
-			new TutorialStep("atx24", "Cabo ATX 24 pinos",
-				"O cabo ATX de 24 pinos é o cabo principal de energia: ele leva a energia da fonte até a placa-mãe.\n\nSem ele conectado, a placa-mãe não liga.",
-				"Segure o conector do cabo e leve-o até o conector de energia da placa-mãe.",
+			new TutorialStep("atx24", "24-Pin ATX Cable",
+				"The 24-pin ATX cable is the main power cable. It carries power from the power supply to the motherboard.\n\nThe motherboard will not turn on without it connected.",
+				"Pick up the cable connector and move it to the motherboard's power connector.",
 				"PowerCableConnector", "IsConnected"),
-			new TutorialStep("hd", "HD (disco rígido)",
-				"O HD é o armazenamento do computador: é onde ficam guardados o sistema operacional, os programas e os seus arquivos, mesmo com o PC desligado.\n\nEle é parafusado no gabinete e ligado à placa-mãe pelo cabo SATA.",
-				"Segure o HD e encaixe-o na baia do gabinete.",
+			new TutorialStep("hd", "Hard Drive",
+				"The hard drive is the computer's storage device. It stores the operating system, programs, and files even when the computer is turned off.\n\nIt is screwed into the case and connected to the motherboard with a SATA cable.",
+				"Pick up the hard drive and install it in the drive bay.",
 				"HardDrivePlacer", "IsInstalled"),
-			new TutorialStep("fim", "Parabéns!",
-				"Você concluiu a montagem das peças do computador. Muito bem!",
+			new TutorialStep("fim", "Congratulations!",
+				"You have completed the computer assembly. Well done!",
 				"", "", ""),
 		};
 	}
